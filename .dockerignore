@@ -1,0 +1,23 @@
+.git
+.gitignore
+node_modules
+server/node_modules
+apps/desktop/node_modules
+apps/worker/node_modules
+packages/shared/node_modules
+
+server/dist
+apps/desktop/dist
+apps/desktop/electron-dist
+apps/desktop/release-build
+apps/desktop/sessions
+apps/worker/dist
+
+.claude
+image.png
+image copy.png
+image copy 2.png
+
+*.log
+*.tsbuildinfo
+

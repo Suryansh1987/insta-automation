@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "electron-dist",
+    "rootDir": "../..",
+    "lib": ["ES2022", "DOM"],
+    "paths": {
+      "@insta-saas/shared": ["../../packages/shared/src/index.ts"]
+    }
+  },
+  "include": ["electron"]
+}

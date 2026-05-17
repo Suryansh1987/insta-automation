@@ -1,0 +1,44 @@
+appId: com.instaflow.app
+productName: InstaFlow
+electronVersion: "33.4.11"
+directories:
+  output: release-build
+
+files:
+  - electron-dist/**
+  - dist/**
+  - package.json
+
+asarUnpack:
+  - "dist/**"
+
+extraResources:
+  # Compiled worker script — runs inside Electron's Node.js (ELECTRON_RUN_AS_NODE=1)
+  - from: ../../apps/worker/dist/worker.js
+    to: worker.js
+
+  # Playwright packages — worker.js requires('playwright') at runtime
+  - from: ../../node_modules/playwright
+    to: node_modules/playwright
+  - from: ../../node_modules/playwright-core
+    to: node_modules/playwright-core
+
+  # Playwright Chromium — bundled so end users never need to install it
+  - from: ../../node_modules/playwright/.local-browsers
+    to: playwright-browsers
+    filter:
+      - chromium-*/**
+
+win:
+  target:
+    - target: dir
+  icon: assets/icon.ico
+  sign: null
+  certificateFile: null
+
+mac:
+  target: dmg
+  icon: assets/icon.icns
+
+linux:
+  target: AppImage

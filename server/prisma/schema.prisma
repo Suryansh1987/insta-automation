@@ -1,0 +1,246 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Plan {
+  free
+  pro
+  max
+}
+
+enum AccountStatus {
+  active
+  paused
+  error
+  disconnected
+}
+
+enum JobStatus {
+  idle
+  running
+  stopped
+  done
+  error
+}
+
+enum SubscriptionStatus {
+  created
+  authenticated
+  active
+  pending
+  halted
+  cancelled
+  completed
+  expired
+}
+
+enum BillingAttemptStatus {
+  created
+  completed
+  failed
+}
+
+enum WebhookProcessStatus {
+  received
+  processed
+  failed
+}
+
+enum UsageMetric {
+  message_attempt
+}
+
+model User {
+  id        String   @id              // Clerk user ID (e.g. user_2abc...)
+  email     String   @unique
+  plan      Plan     @default(free)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  igAccounts IgAccount[]
+  jobs       AutomationJob[]
+  subscriptions      Subscription[]
+  billingAttempts    BillingAttempt[]
+  usageCounters      DailyUsageCounter[]
+  usageEvents        UsageEvent[]
+
+  @@map("users")
+}
+
+model IgAccount {
+  id           String        @id @default(cuid())
+  userId       String        @map("user_id")
+  username     String
+  proxy        String?
+  status         AccountStatus @default(active)
+  lastActiveAt   DateTime?     @map("last_active_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs AutomationJob[]
+
+  @@unique([userId, username])
+  @@index([userId])
+  @@map("ig_accounts")
+}
+
+model AutomationJob {
+  id             String    @id @default(cuid())
+  userId         String    @map("user_id")
+  igAccountId    String    @map("ig_account_id")
+  status         JobStatus @default(idle)
+  totalTargets   Int       @default(0) @map("total_targets")
+  sent           Int       @default(0)
+  failed         Int       @default(0)
+  defaultMessage String?   @map("default_message") @db.Text
+  totalTokens    Int       @default(0) @map("total_tokens")
+  startedAt      DateTime? @map("started_at")
+  stoppedAt      DateTime? @map("stopped_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  user           User            @relation(fields: [userId], references: [id])
+  igAccount      IgAccount       @relation(fields: [igAccountId], references: [id])
+  logs           JobLog[]
+  messageRecords MessageRecord[]
+
+  @@index([userId, status])
+  @@map("automation_jobs")
+}
+
+model JobLog {
+  id        String   @id @default(cuid())
+  jobId     String   @map("job_id")
+  level     String
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  job AutomationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, createdAt])
+  @@map("job_logs")
+}
+
+model MessageRecord {
+  id           String    @id @default(cuid())
+  jobId        String    @map("job_id")
+  username     String
+  messageSent  String?   @map("message_sent") @db.Text
+  status       String
+  tokenCount   Int       @default(0) @map("token_count")
+  errorReason  String?   @map("error_reason")
+  seen         Boolean   @default(false)
+  seenAt       DateTime? @map("seen_at")
+  replied      Boolean   @default(false)
+  repliedAt    DateTime? @map("replied_at")
+  replyPreview String?   @map("reply_preview") @db.Text
+  sentAt       DateTime  @default(now()) @map("sent_at")
+
+  job AutomationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("message_records")
+}
+
+model Subscription {
+  id                     String             @id @default(cuid())
+  userId                 String             @map("user_id")
+  plan                   Plan
+  provider               String             @default("razorpay")
+  status                 SubscriptionStatus @default(created)
+  providerSubscriptionId String?            @unique @map("provider_subscription_id")
+  providerCustomerId     String?            @map("provider_customer_id")
+  shortUrl               String?            @map("short_url")
+  currentStart           DateTime?          @map("current_start")
+  currentEnd             DateTime?          @map("current_end")
+  cancelAtCycleEnd       Boolean            @default(false) @map("cancel_at_cycle_end")
+  lastPaymentId          String?            @map("last_payment_id")
+  metadata               Json?
+  createdAt              DateTime           @default(now()) @map("created_at")
+  updatedAt              DateTime           @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  billingAttempts BillingAttempt[]
+
+  @@index([userId, createdAt])
+  @@map("subscriptions")
+}
+
+model BillingAttempt {
+  id                     String               @id @default(cuid())
+  userId                 String               @map("user_id")
+  subscriptionId         String?              @map("subscription_id")
+  targetPlan             Plan                 @map("target_plan")
+  provider               String               @default("razorpay")
+  status                 BillingAttemptStatus @default(created)
+  idempotencyKey         String               @unique @map("idempotency_key")
+  providerSubscriptionId String?              @map("provider_subscription_id")
+  providerPaymentId      String?              @map("provider_payment_id")
+  errorCode              String?              @map("error_code")
+  errorDescription       String?              @map("error_description")
+  metadata               Json?
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("billing_attempts")
+}
+
+model WebhookEvent {
+  id          String               @id @default(cuid())
+  provider    String               @default("razorpay")
+  eventId     String               @map("event_id")
+  eventType   String               @map("event_type")
+  signature   String?              @map("signature")
+  status      WebhookProcessStatus @default(received)
+  payload     Json
+  error       String?
+  processedAt DateTime?            @map("processed_at")
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  @@unique([provider, eventId])
+  @@index([eventType, createdAt])
+  @@map("webhook_events")
+}
+
+model DailyUsageCounter {
+  id        String      @id @default(cuid())
+  userId    String      @map("user_id")
+  usageDate DateTime    @db.Date @map("usage_date")
+  metric    UsageMetric
+  used      Int         @default(0)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usageEvents UsageEvent[]
+
+  @@unique([userId, usageDate, metric])
+  @@index([userId, usageDate])
+  @@map("daily_usage_counters")
+}
+
+model UsageEvent {
+  id             String      @id @default(cuid())
+  userId         String      @map("user_id")
+  counterId      String      @map("counter_id")
+  metric         UsageMetric
+  usageDate      DateTime    @db.Date @map("usage_date")
+  quantity       Int         @default(1)
+  idempotencyKey String      @unique @map("idempotency_key")
+  metadata       Json?
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  counter DailyUsageCounter @relation(fields: [counterId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usageDate])
+  @@map("usage_events")
+}

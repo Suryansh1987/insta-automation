@@ -1,0 +1,13 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: insta-saas-api
+    restart: unless-stopped
+    env_file:
+      - ./server/.env
+    ports:
+      - "3001:3001"
+    command: ["npm", "run", "start", "--workspace=server"]
+

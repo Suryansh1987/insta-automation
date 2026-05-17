@@ -1,0 +1,20 @@
+{
+  "name": "@insta-saas/worker",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/worker.js",
+  "scripts": {
+    "dev": "tsx src/worker.ts",
+    "build": "npx esbuild src/worker.ts --bundle --platform=node --target=node20 --external:playwright --outfile=dist/worker.js"
+  },
+  "dependencies": {
+    "@insta-saas/shared": "*",
+    "openai": "^6.37.0",
+    "playwright": "^1.52.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.8.1",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}
