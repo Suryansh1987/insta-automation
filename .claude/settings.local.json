@@ -4,7 +4,9 @@
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\packages\\\\shared\" | ForEach-Object { $_.Name })",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\packages\\\\shared\\\\src\" | ForEach-Object { $_.Name })",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\packages\\\\shared\\\\src\\\\types\" | ForEach-Object { $_.Name })",
-      "PowerShell(cmd /c \"dir /b C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\packages\\\\shared\\\\src && echo --- && dir /b C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\packages\\\\shared\\\\src\\\\types\")"
+      "PowerShell(cmd /c \"dir /b C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\packages\\\\shared\\\\src && echo --- && dir /b C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\packages\\\\shared\\\\src\\\\types\")",
+      "PowerShell(cmd /c \"dir /b C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\node_modules\\\\@clerk 2>nul || echo NOT_FOUND\")",
+      "PowerShell(cmd /c \"findstr /m \"\"Appearance\"\" C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\node_modules\\\\@clerk\\\\clerk-react\\\\dist\\\\index.d.ts 2>nul && echo FOUND || echo NOT_IN_INDEX\")"
     ]
   }
 }
