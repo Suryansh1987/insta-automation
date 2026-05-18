@@ -5,4 +5,4 @@ echo "[docker] running prisma migrate deploy..."
 npm run migrate:deploy --workspace=server
 
 echo "[docker] starting api..."
-exec "$@"
+exec npm run start --workspace=server

@@ -5,13 +5,14 @@ import { usePlanStore } from "../store/plan";
 import { useAutomationStore } from "../store/automation";
 import { PLAN_LIMITS } from "@insta-saas/shared";
 import type { WorkerMessage } from "@insta-saas/shared";
+import Toaster from "./ui/Toaster";
+import BrandMark from "./BrandMark";
 
 const NAV_LINKS = [
   { to: "/",           label: "Dashboard",  icon: "▦" },
   { to: "/accounts",   label: "Accounts",   icon: "◎" },
   { to: "/automation", label: "Automation", icon: "▶" },
   { to: "/history",    label: "History",    icon: "◷" },
-  { to: "/logs",       label: "Live Logs",  icon: "≡" },
   { to: "/plans",      label: "Plans",      icon: "✦" },
 ];
 
@@ -41,19 +42,17 @@ export default function Layout() {
         display: "flex", flexDirection: "column",
       }}>
         {/* Brand */}
-        <div style={{ padding: "20px 18px 16px", borderBottom: "1px solid var(--line)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-              background: "linear-gradient(135deg, var(--accent), #b85a3f)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 13, fontWeight: 800, color: "#1a1917",
-              fontFamily: "var(--font-display)",
-            }}>IF</div>
-            <div>
-              <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14, color: "var(--fg)", lineHeight: 1 }}>InstaFlow</div>
-              <div style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 2 }}>{planLabel} plan</div>
-            </div>
+        <div style={{ padding: "18px 16px 16px", borderBottom: "1px solid var(--line)" }}>
+          <div
+            style={{
+              marginBottom: 14,
+              padding: "12px 14px",
+              borderRadius: "18px",
+              border: "1px solid var(--line)",
+              background: "linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))",
+            }}
+          >
+            <BrandMark size={56} compact subtitle={`${planLabel} plan`} />
           </div>
 
           {/* Running indicator */}
@@ -122,6 +121,8 @@ export default function Layout() {
       <main style={{ flex: 1, overflow: "auto", background: "var(--bg-app)" }}>
         <Outlet />
       </main>
+
+      <Toaster />
 
       <style>{`
         @keyframes pulse {

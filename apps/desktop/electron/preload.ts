@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld("worker", {
   stop: (accountId: string): Promise<{ ok?: true; error?: string }> =>
     ipcRenderer.invoke("worker:stop", accountId),
 
+  refreshToken: (accountId: string, token: string): Promise<{ ok?: true; error?: string }> =>
+    ipcRenderer.invoke("worker:refreshToken", accountId, token),
+
   kill: (accountId: string): Promise<{ ok?: true; error?: string }> =>
     ipcRenderer.invoke("worker:kill", accountId),
 
@@ -83,8 +86,6 @@ function rlog(tag: string, ...args: unknown[]) {
     a == null ? String(a) :
     typeof a === "object" ? JSON.stringify(a) : String(a)
   ).join(" ");
-  const line = `[${ts}] [preload:${tag}] ${body}`;
-  console.log(line);
   ipcRenderer.send("debug:log", tag, ...args);
 }
 

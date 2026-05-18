@@ -8,9 +8,9 @@ export interface PlanLimit {
 }
 
 export const PLAN_LIMITS: Record<Plan, PlanLimit> = {
-  free: { maxAccounts: 1, dailyMessages: 10, label: "Free", price: "$0/mo" },
-  pro: { maxAccounts: 3, dailyMessages: 200, label: "Pro", price: "Razorpay plan" },
-  max: { maxAccounts: 5, dailyMessages: 1000, label: "Max", price: "Razorpay plan" },
+  free: { maxAccounts: 1, dailyMessages: 10, label: "Free", price: "0" },
+  pro: { maxAccounts: 3, dailyMessages: 200, label: "Pro", price: "3000" },
+  max: { maxAccounts: 5, dailyMessages: 1000, label: "Max", price: "6000" },
 };
 
 export const PLAN_FEATURES: Record<Plan, string[]> = {

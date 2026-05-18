@@ -40,15 +40,13 @@ export async function scrapeProfile(
   onProgress?.({ stageId: "check_bio", label: "Checking description", state: "active" });
   const bio = await scrapeBio(page);
   onProgress?.({ stageId: "check_bio", label: "Checking description", state: "done", detail: bio ? "Description captured" : "No description found" });
-  console.log(`  Bio: ${bio.slice(0, 80) || "(none)"}`);
 
   let profileScreenshot: Buffer | null = null;
   onProgress?.({ stageId: "capture_screenshot", label: "Taking screenshot", state: "active" });
   try {
     profileScreenshot = await page.screenshot({ fullPage: false });
-    console.log(`  Profile screenshot captured (${(profileScreenshot.length / 1024).toFixed(0)} KB)`);
   } catch {
-    console.log("  Profile screenshot failed - continuing without image");
+    // continue without screenshot
   }
   onProgress?.({
     stageId: "capture_screenshot",
@@ -71,7 +69,6 @@ export async function scrapeProfile(
     return result;
   }, limit);
 
-  console.log(`  Found ${hrefs.length} post link(s) on profile.`);
   onProgress?.({
     stageId: "check_likes",
     label: "Checking likes and posts",
@@ -97,12 +94,9 @@ export async function scrapeProfile(
       const comments = await extractComments(page);
 
       posts.push({ caption, likes, comments });
-      console.log(`  Post ${i + 1}: ${caption.slice(0, 60)}... | likes: ${likes ?? "hidden"} | comments: ${comments ?? "?"}`);
-
       await page.goBack({ waitUntil: "domcontentloaded" });
       await page.waitForTimeout(1_500);
-    } catch (err) {
-      console.log(`  Post ${i + 1}: error - ${(err as Error).message.split("\n")[0]}`);
+    } catch {
       await page.goto(profileUrl, { waitUntil: "domcontentloaded" }).catch(() => {});
       await page.waitForTimeout(1_500);
     }

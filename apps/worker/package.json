@@ -5,7 +5,7 @@
   "main": "dist/worker.js",
   "scripts": {
     "dev": "tsx src/worker.ts",
-    "build": "npx esbuild src/worker.ts --bundle --platform=node --target=node20 --external:playwright --outfile=dist/worker.js"
+    "build": "esbuild src/worker.ts --bundle --platform=node --target=node20 --external:playwright --outfile=dist/worker.js"
   },
   "dependencies": {
     "@insta-saas/shared": "*",

@@ -32,14 +32,12 @@ export async function generatePersonalizedMessage(
     });
 
     if (!res.ok) {
-      console.warn(`Personalize API returned ${res.status}`);
       return { message: null, tokenCount: 0 };
     }
 
     const data = (await res.json()) as PersonalizeResponse;
     return { message: data.message, tokenCount: data.tokenCount ?? 0 };
-  } catch (err) {
-    console.warn(`Personalize API call failed: ${(err as Error).message}`);
+  } catch {
     return { message: null, tokenCount: 0 };
   }
 }

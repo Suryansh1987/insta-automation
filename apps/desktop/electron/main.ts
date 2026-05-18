@@ -1,8 +1,8 @@
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, shell } from "electron";
 import path from "path";
 import http from "http";
 import fs from "fs";
-import { spawn, ChildProcess } from "child_process";
+import { spawn, ChildProcess, execSync } from "child_process";
 import type { AddressInfo } from "net";
 import type { WorkerStartCmd, WorkerConnectCmd, WorkerCheckCmd, WorkerMessage } from "@insta-saas/shared";
 import { initLogger, log } from "./logger";
@@ -81,6 +81,7 @@ async function createWindow(): Promise<void> {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -88,7 +89,9 @@ async function createWindow(): Promise<void> {
     },
   });
 
-  mainWindow.webContents.openDevTools();
+  Menu.setApplicationMenu(null);
+  mainWindow.removeMenu();
+  mainWindow.setMenuBarVisibility(false);
 
   let appURL: string;
   if (IS_DEV) {
@@ -118,8 +121,9 @@ async function createWindow(): Promise<void> {
   //   did-fail-provisional-load → navigation failed before any response
   // ─────────────────────────────────────────────────────────────
 
-  wc.on("will-navigate", (event, url) => {
+  wc.on("will-navigate", (event, url, _isInPlace, isMainFrame) => {
     log("will-navigate", url);
+    if (!isMainFrame) return; // allow subframe/iframe navigations (e.g. Razorpay checkout iframe)
     if (url.startsWith(appURL)) return; // same-origin — always allow
 
     event.preventDefault();
@@ -201,18 +205,32 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  for (const worker of workers.values()) worker.kill();
+  for (const worker of workers.values()) killWorkerTree(worker);
   localServer?.close();
   if (process.platform !== "darwin") app.quit();
 });
 
 // ─── Worker IPC ───────────────────────────────────────────────────────────────
 
+// On Windows, worker.kill() only kills the Node process — chrome-headless-shell
+// grandchildren become orphans and keep their lock on the session directory.
+// taskkill /F /T kills the entire process tree including all descendants.
+function killWorkerTree(proc: ChildProcess): void {
+  if (process.platform === "win32" && proc.pid) {
+    try {
+      execSync(`taskkill /F /T /PID ${proc.pid}`, { stdio: "ignore" });
+    } catch { /* process may already be gone */ }
+  } else {
+    proc.kill("SIGKILL");
+  }
+}
+
 function spawnWorker(accountId: string, firstCmd: object): ChildProcess | { error: string } {
   // Auto-kill any existing worker for this account so the user can restart freely
   const existing = workers.get(accountId);
   if (existing) {
-    existing.kill("SIGKILL");
+    existing.removeAllListeners("exit"); // prevent the exit handler from sending a spurious error status to the UI
+    killWorkerTree(existing);
     workers.delete(accountId);
     log("worker:spawn", `killed existing worker for accountId=${accountId} before respawn`);
   }
@@ -257,16 +275,18 @@ function spawnWorker(accountId: string, firstCmd: object): ChildProcess | { erro
       if (!trimmed) continue;
       try {
         const msg: WorkerMessage = JSON.parse(trimmed);
+        log("worker:ipc-out", JSON.stringify(msg));
         mainWindow?.webContents.send("worker:message", msg);
       } catch { /* ignore non-JSON */ }
     }
   });
 
-  proc.on("exit", (code) => {
-    log("worker:exit", `accountId=${accountId} code=${code}`);
+  proc.on("exit", (code, signal) => {
+    log("worker:exit", `accountId=${accountId} pid=${proc.pid} code=${code} signal=${signal}`);
     workers.delete(accountId);
     // If the worker exits without sending a terminal status, synthesise an error
     // so the UI doesn't stay stuck at "Browser open…" forever.
+    log("worker:exit", `sending synthetic error status to UI for accountId=${accountId}`);
     mainWindow?.webContents.send("worker:message", {
       type: "status", accountId, jobId: accountId, status: "error",
     } satisfies WorkerMessage);
@@ -275,14 +295,26 @@ function spawnWorker(accountId: string, firstCmd: object): ChildProcess | { erro
   return proc;
 }
 
+// In dev, store sessions next to the project so they persist across restarts
+// and match the location created by older dev runs. In prod, use the OS userData dir.
+const sessionsBase = IS_DEV
+  ? path.join(app.getAppPath(), "sessions")
+  : path.join(app.getPath("userData"), "sessions");
+log("sessions", `sessionsBase=${sessionsBase} IS_DEV=${IS_DEV} appPath=${app.getAppPath()}`);
+
 ipcMain.handle("worker:connect", async (_event, cmd: WorkerConnectCmd) => {
-  const result = spawnWorker(cmd.accountId, cmd);
+  const result = spawnWorker(cmd.accountId, {
+    ...cmd,
+    sessionDir: path.join(sessionsBase, cmd.accountId),
+  });
   if ("error" in result) return result;
   return { ok: true };
 });
 
 ipcMain.handle("worker:start", async (_event, cmd: WorkerStartCmd) => {
-  const result = spawnWorker(cmd.accountId, cmd);
+  const sessionDir = path.join(sessionsBase, cmd.accountId);
+  log("worker:start", `accountId=${cmd.accountId} sessionDir=${sessionDir} targets=${cmd.targets?.length ?? 0}`);
+  const result = spawnWorker(cmd.accountId, { ...cmd, sessionDir });
   if ("error" in result) return result;
   return { ok: true };
 });
@@ -294,15 +326,24 @@ ipcMain.handle("worker:stop", async (_event, accountId: string) => {
   return { ok: true };
 });
 
+ipcMain.handle("worker:refreshToken", async (_event, accountId: string, token: string) => {
+  const worker = workers.get(accountId);
+  if (!worker) return { ok: true }; // job already finished, no-op
+  worker.stdin!.write(JSON.stringify({ cmd: "refreshToken", token }) + "\n");
+  log("worker:refreshToken", `sent fresh token to worker for accountId=${accountId}`);
+  return { ok: true };
+});
+
 ipcMain.handle("worker:kill", async (_event, accountId: string) => {
+  log("worker:kill", `called for accountId=${accountId} hasWorker=${workers.has(accountId)}`);
   const worker = workers.get(accountId);
   if (!worker) {
-    // Nothing running — already clean
+    log("worker:kill", `no worker found for accountId=${accountId} — nothing to kill`);
     return { ok: true };
   }
-  worker.kill("SIGKILL");
+  killWorkerTree(worker);
   workers.delete(accountId);
-  log("worker:kill", `force-killed worker for accountId=${accountId}`);
+  log("worker:kill", `force-killed worker pid=${worker.pid} for accountId=${accountId}`);
   return { ok: true };
 });
 
@@ -311,7 +352,10 @@ ipcMain.handle("worker:isRunning", async (_event, accountId: string) => {
 });
 
 ipcMain.handle("worker:check", async (_event, cmd: WorkerCheckCmd) => {
-  const result = spawnWorker(cmd.accountId, cmd);
+  const result = spawnWorker(cmd.accountId, {
+    ...cmd,
+    sessionDir: path.join(sessionsBase, cmd.accountId),
+  });
   if ("error" in result) return result;
   return { ok: true };
 });

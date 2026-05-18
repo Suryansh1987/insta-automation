@@ -22,6 +22,8 @@ const startSchema = z
     message: "minDelayMs must be <= maxDelayMs",
   });
 
+const MAX_CONCURRENT_JOBS = 2;
+
 automationRouter.post("/start", async (req, res, next) => {
   try {
     const r = req as unknown as AuthRequest;
@@ -31,6 +33,17 @@ automationRouter.post("/start", async (req, res, next) => {
       where: { id: body.igAccountId, userId: r.userId },
     });
     if (!account) return res.status(404).json({ error: "Instagram account not found." });
+
+    // Enforce concurrent job limit server-side
+    const runningCount = await prisma.automationJob.count({
+      where: { userId: r.userId, status: "running" },
+    });
+    if (runningCount >= MAX_CONCURRENT_JOBS) {
+      return res.status(429).json({
+        error: `You can run at most ${MAX_CONCURRENT_JOBS} automation jobs at the same time. Stop a running job first.`,
+        code: "CONCURRENT_JOB_LIMIT_REACHED",
+      });
+    }
 
     // Auto-stop any previously running job for this account
     await prisma.automationJob.updateMany({
@@ -271,27 +284,29 @@ automationRouter.get("/analytics", async (req, res, next) => {
   try {
     const r = req as unknown as AuthRequest;
 
-    // Last 7 days daily stats
-    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    // Chart range: ?days=7|14|30 (default 7)
+    const days = Math.min(90, Math.max(1, Number(req.query.days) || 7));
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
     const records = await prisma.messageRecord.findMany({
       where: { job: { userId: r.userId }, sentAt: { gte: since } },
       select: { sentAt: true, status: true, tokenCount: true, seen: true, replied: true },
     });
 
     const dayMap: Record<string, { date: string; sent: number; failed: number; tokens: number; seen: number; replied: number }> = {};
-    for (let i = 6; i >= 0; i--) {
+    for (let i = days - 1; i >= 0; i--) {
       const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
       const key = d.toISOString().slice(0, 10);
       dayMap[key] = { date: key, sent: 0, failed: 0, tokens: 0, seen: 0, replied: 0 };
     }
-    for (const r of records) {
-      const key = r.sentAt.toISOString().slice(0, 10);
+    for (const rec of records) {
+      const key = rec.sentAt.toISOString().slice(0, 10);
       if (!dayMap[key]) continue;
-      if (r.status === "sent") dayMap[key].sent++;
-      else if (r.status === "failed") dayMap[key].failed++;
-      dayMap[key].tokens += r.tokenCount;
-      if (r.seen) dayMap[key].seen++;
-      if (r.replied) dayMap[key].replied++;
+      if (rec.status === "sent") dayMap[key].sent++;
+      else if (rec.status === "failed") dayMap[key].failed++;
+      dayMap[key].tokens += rec.tokenCount;
+      if (rec.seen) dayMap[key].seen++;
+      if (rec.replied) dayMap[key].replied++;
     }
 
     // All-time totals
@@ -301,13 +316,30 @@ automationRouter.get("/analytics", async (req, res, next) => {
       _count: { id: true },
     });
 
-    // Today's jobs
-    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-    const todayJobs = await prisma.automationJob.findMany({
-      where: { userId: r.userId, createdAt: { gte: todayStart } },
-      orderBy: { createdAt: "desc" },
-      include: { igAccount: { select: { username: true } } },
-    });
+    // Jobs for a specific date: ?jobsDate=YYYY-MM-DD (default today)
+    const jobsDateParam = typeof req.query.jobsDate === "string" ? req.query.jobsDate : null;
+    const jobsDate = jobsDateParam && /^\d{4}-\d{2}-\d{2}$/.test(jobsDateParam)
+      ? new Date(jobsDateParam + "T00:00:00")
+      : (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+    const jobsDateEnd = new Date(jobsDate.getTime() + 24 * 60 * 60 * 1000);
+
+    // Pagination: ?jobsPage=1&jobsLimit=5
+    const jobsPage  = Math.max(1, Number(req.query.jobsPage) || 1);
+    const jobsLimit = Math.min(50, Math.max(1, Number(req.query.jobsLimit) || 5));
+    const jobsSkip  = (jobsPage - 1) * jobsLimit;
+
+    const [jobsTotal, jobs] = await Promise.all([
+      prisma.automationJob.count({
+        where: { userId: r.userId, createdAt: { gte: jobsDate, lt: jobsDateEnd } },
+      }),
+      prisma.automationJob.findMany({
+        where: { userId: r.userId, createdAt: { gte: jobsDate, lt: jobsDateEnd } },
+        orderBy: { createdAt: "desc" },
+        skip: jobsSkip,
+        take: jobsLimit,
+        include: { igAccount: { select: { username: true } } },
+      }),
+    ]);
 
     res.json({
       daily: Object.values(dayMap),
@@ -317,7 +349,10 @@ automationRouter.get("/analytics", async (req, res, next) => {
         failed: totals._sum.failed ?? 0,
         tokens: totals._sum.totalTokens ?? 0,
       },
-      todayJobs,
+      todayJobs: jobs,
+      jobsTotal,
+      jobsPage,
+      jobsLimit,
     });
   } catch (err) {
     next(err);

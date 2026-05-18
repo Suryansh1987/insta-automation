@@ -13,6 +13,7 @@ import {
 } from "@insta-saas/shared";
 import {
   attachSuccessfulPayment,
+  cancelRazorpaySubscription,
   createRazorpaySubscription,
   fetchRazorpaySubscription,
   getRazorpayPublicConfig,
@@ -40,6 +41,10 @@ const verifySchema = z.object({
   razorpay_payment_id: z.string(),
   razorpay_subscription_id: z.string(),
   razorpay_signature: z.string(),
+});
+
+const cancelSchema = z.object({
+  cancelAtCycleEnd: z.boolean().default(true),
 });
 
 function serializeSubscription(subscription: any) {
@@ -112,14 +117,33 @@ plansRouter.post("/subscribe", async (req, res, next) => {
     });
 
     if (existing?.shortUrl) {
-      const body: CreateSubscriptionResponse = {
-        plan,
-        checkoutUrl: existing.shortUrl,
-        idempotencyKey: `existing:${existing.id}`,
-        subscription: serializeSubscription(existing)!,
-        message: `Continue your ${plan} subscription checkout.`,
-      };
-      return res.json(body);
+      // Verify the existing subscription belongs to the current Razorpay account
+      // (it may have been created with live credentials when we're now in test mode or vice versa)
+      // Also confirm it is still in a checkout-able state — subscriptions with expire_by
+      // become "halted" after 30 min and can no longer accept payment.
+      const CHECKOUTABLE_STATUSES = new Set(["created", "authenticated", "pending"]);
+      let existingIsValid = false;
+      try {
+        const providerSub = await fetchRazorpaySubscription(existing.providerSubscriptionId);
+        existingIsValid = CHECKOUTABLE_STATUSES.has(providerSub.status);
+        // Keep local status in sync so future queries reflect reality
+        if (providerSub.status !== existing.status) {
+          await syncSubscriptionFromProvider(providerSub);
+        }
+      } catch {
+        existingIsValid = false;
+      }
+
+      if (existingIsValid) {
+        const body: CreateSubscriptionResponse = {
+          plan,
+          checkoutUrl: existing.shortUrl,
+          idempotencyKey: `existing:${existing.id}`,
+          subscription: serializeSubscription(existing)!,
+          message: `Continue your ${plan} subscription checkout.`,
+        };
+        return res.json(body);
+      }
     }
 
     const user = await prisma.user.findUnique({
@@ -215,6 +239,47 @@ plansRouter.post("/verify", async (req, res, next) => {
     res.json({
       plan: reconciled.plan,
       subscription: serializeSubscription(updated),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+plansRouter.post("/cancel", async (req, res, next) => {
+  try {
+    if (!isBillingReady()) {
+      return res.status(503).json({ error: "Razorpay is not configured yet." });
+    }
+
+    const r = req as AuthRequest;
+    const { cancelAtCycleEnd } = cancelSchema.parse(req.body ?? {});
+
+    const subscription = await db.subscription.findFirst({
+      where: {
+        userId: r.userId,
+        status: { in: ["authenticated", "active"] },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!subscription) {
+      return res.status(404).json({ error: "No active subscription found." });
+    }
+
+    const providerPayload = await cancelRazorpaySubscription(
+      subscription.providerSubscriptionId,
+      cancelAtCycleEnd,
+    );
+
+    const updated = await syncSubscriptionFromProvider(providerPayload);
+    const reconciled = await reconcileUserPlan(r.userId);
+
+    res.json({
+      plan: reconciled.plan,
+      subscription: serializeSubscription(updated ?? subscription),
+      message: cancelAtCycleEnd
+        ? "Subscription will be cancelled at the end of the current billing period."
+        : "Subscription cancelled immediately.",
     });
   } catch (err) {
     next(err);

@@ -1,7 +1,23 @@
 import { useEffect, useState } from "react";
 import api from "../api/client";
 import type { AutomationJob, MessageRecord } from "@insta-saas/shared";
-import LoadingState from "../components/ui/loading-state";
+
+const pulseKeyframes = `
+@keyframes skpulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}`;
+
+function Skeleton({ w, h, radius = 5 }: { w: string | number; h: number; radius?: number }) {
+  return (
+    <div style={{
+      width: w, height: h, borderRadius: radius,
+      background: "var(--bg-canvas)",
+      animation: "skpulse 1.6s ease-in-out infinite",
+      flexShrink: 0,
+    }} />
+  );
+}
 
 interface JobRow {
   id: string;
@@ -39,68 +55,113 @@ export default function History() {
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", position: "relative" }}>
-      <div style={{ width: 320, flexShrink: 0, borderRight: "1px solid var(--line)", overflowY: "auto", padding: "24px 16px", position: "relative" }}>
-        <h1 style={{ margin: "0 0 18px", fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--fg)", padding: "0 4px" }}>
-          Run History
-        </h1>
+    <>
+      <style>{pulseKeyframes}</style>
+      <div style={{ display: "flex", height: "100vh" }}>
+        {/* Sidebar */}
+        <div style={{ width: 320, flexShrink: 0, borderRight: "1px solid var(--line)", overflowY: "auto", padding: "24px 16px" }}>
+          <h1 style={{ margin: "0 0 18px", fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--fg)", padding: "0 4px" }}>
+            Run History
+          </h1>
 
-        {jobs.length === 0 ? (
-          <p style={{ color: "var(--fg-4)", fontSize: 13, padding: "0 4px" }}>No runs yet.</p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {jobs.map((job) => (
-              <div
-                key={job.id}
-                onClick={() => openJob(job.id)}
-                style={{
-                  background: selectedJob?.id === job.id ? "var(--accent-soft)" : "var(--bg-card)",
-                  border: `1px solid ${selectedJob?.id === job.id ? "var(--accent-line)" : "var(--line)"}`,
-                  borderRadius: "var(--radius-md)",
-                  padding: "12px 14px",
-                  cursor: "pointer",
-                  transition: "border-color 0.15s",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13, color: "var(--fg)" }}>@{job.igAccount?.username ?? "-"}</span>
-                  <StatusPill status={job.status} />
+          {loading ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} style={{ background: "var(--bg-card)", border: "1px solid var(--line)", borderRadius: "var(--radius-md)", padding: "12px 14px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                    <Skeleton w={100} h={13} />
+                    <Skeleton w={52} h={18} radius={99} />
+                  </div>
+                  <Skeleton w={130} h={11} />
+                  <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                    <Skeleton w={44} h={11} />
+                    <Skeleton w={44} h={11} />
+                    <Skeleton w={44} h={11} />
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: "var(--fg-3)", marginBottom: 6 }}>{fmtDate(job.createdAt)}</div>
-                <div style={{ display: "flex", gap: 12, fontSize: 11 }}>
-                  <Stat label="Total" value={job.totalTargets} />
-                  <Stat label="Sent" value={job.sent} color="var(--positive)" />
-                  <Stat label="Failed" value={job.failed} color="var(--accent)" />
+              ))}
+            </div>
+          ) : jobs.length === 0 ? (
+            <p style={{ color: "var(--fg-4)", fontSize: 13, padding: "0 4px" }}>No runs yet.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {jobs.map((job) => (
+                <div
+                  key={job.id}
+                  onClick={() => openJob(job.id)}
+                  style={{
+                    background: selectedJob?.id === job.id ? "var(--accent-soft)" : "var(--bg-card)",
+                    border: `1px solid ${selectedJob?.id === job.id ? "var(--accent-line)" : "var(--line)"}`,
+                    borderRadius: "var(--radius-md)",
+                    padding: "12px 14px",
+                    cursor: "pointer",
+                    transition: "border-color 0.15s",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontWeight: 600, fontSize: 13, color: "var(--fg)" }}>@{job.igAccount?.username ?? "-"}</span>
+                    <StatusPill status={job.status} />
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--fg-3)", marginBottom: 6 }}>{fmtDate(job.createdAt)}</div>
+                  <div style={{ display: "flex", gap: 12, fontSize: 11 }}>
+                    <Stat label="Total" value={job.totalTargets} />
+                    <Stat label="Sent" value={job.sent} color="var(--positive)" />
+                    <Stat label="Failed" value={job.failed} color="var(--accent)" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Detail panel */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
+          {detailLoading ? (
+            <div>
+              <div style={{ background: "var(--bg-card)", borderRadius: "var(--radius-md)", padding: 18, border: "1px solid var(--line)", marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <Skeleton w={140} h={20} radius={6} />
+                    <Skeleton w={100} h={12} />
+                  </div>
+                  <Skeleton w={70} h={24} radius={99} />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} style={{ background: "var(--bg-canvas)", borderRadius: "var(--radius-sm)", padding: "10px 12px" }}>
+                      <Skeleton w="60%" h={10} />
+                      <div style={{ marginTop: 8 }}><Skeleton w="40%" h={24} radius={6} /></div>
+                    </div>
+                  ))}
+                </div>
+                <Skeleton w="100%" h={36} radius={6} />
+              </div>
+              <div style={{ background: "var(--bg-card)", borderRadius: "var(--radius-md)", padding: 18, border: "1px solid var(--line)" }}>
+                <Skeleton w={120} h={16} />
+                <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                      <Skeleton w={90} h={12} />
+                      <Skeleton w={50} h={20} radius={99} />
+                      <Skeleton w={30} h={12} />
+                      <Skeleton w={30} h={12} />
+                      <Skeleton w={160} h={12} />
+                      <Skeleton w={50} h={12} />
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-        {loading && (
-          <LoadingState
-            overlay
-            title="Loading run history"
-            subtitle="Fetching recent automation jobs."
-          />
-        )}
+            </div>
+          ) : selectedJob ? (
+            <JobDetail job={selectedJob} />
+          ) : (
+            <div style={{ textAlign: "center", paddingTop: 80, color: "var(--fg-4)", fontSize: 13 }}>
+              Select a run to see details
+            </div>
+          )}
+        </div>
       </div>
-
-      <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px", position: "relative" }}>
-        {!detailLoading && selectedJob && <JobDetail job={selectedJob} />}
-        {!detailLoading && !selectedJob && (
-          <div style={{ textAlign: "center", paddingTop: 80, color: "var(--fg-4)", fontSize: 13 }}>
-            Select a run to see details
-          </div>
-        )}
-        {detailLoading && (
-          <LoadingState
-            overlay
-            title="Loading run details"
-            subtitle="Pulling messages, statuses, and outcomes for this job."
-          />
-        )}
-      </div>
-    </div>
+    </>
   );
 }
 

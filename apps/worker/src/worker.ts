@@ -9,8 +9,25 @@ console.log = toStderr;
 console.warn = toStderr;
 console.error = toStderr;
 
+// Global safety net — catch any unhandled exception or rejection before it silently kills the process
+process.on("uncaughtException", (err: Error) => {
+  process.stderr.write(`[worker] UNCAUGHT EXCEPTION: ${err.message}\n${err.stack ?? ""}\n`);
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason: unknown) => {
+  const msg = reason instanceof Error ? `${reason.message}\n${reason.stack ?? ""}` : String(reason);
+  process.stderr.write(`[worker] UNHANDLED REJECTION: ${msg}\n`);
+});
+
 let stopRequested = false;
 let isRunning = false;
+
+// Clerk session tokens expire in ~60 s. The frontend pushes a fresh token via
+// stdin every 45 s so long-running jobs never hit 401s.
+let latestAuthToken: string | null = null;
+function getAuthToken(cmd: WorkerStartCmd | WorkerCheckCmd): string {
+  return latestAuthToken ?? cmd.authToken;
+}
 
 function emit(msg: WorkerMessage): void {
   process.stdout.write(JSON.stringify(msg) + "\n");
@@ -57,8 +74,15 @@ process.stdin.on("end", () => {
 });
 
 function handleCommand(cmd: { cmd: string } & Record<string, unknown>): void {
+  process.stderr.write(`[worker] handleCommand cmd=${cmd.cmd} sessionDir=${cmd.sessionDir ?? "(none)"} isRunning=${isRunning}\n`);
   if (cmd.cmd === "stop") {
     stopRequested = true;
+  } else if (cmd.cmd === "refreshToken") {
+    const token = cmd.token as string | undefined;
+    if (token) {
+      latestAuthToken = token;
+      process.stderr.write(`[worker] auth token refreshed\n`);
+    }
   } else if (cmd.cmd === "connect") {
     if (isRunning) {
       process.stderr.write("[worker] Already running — ignoring connect.\n");
@@ -72,8 +96,9 @@ function handleCommand(cmd: { cmd: string } & Record<string, unknown>): void {
       process.stderr.write("[worker] Already running — ignoring start.\n");
       return;
     }
+    process.stderr.write(`[worker] Starting job with ${(cmd.targets as unknown[])?.length ?? 0} targets\n`);
     runJob(cmd as unknown as WorkerStartCmd).catch((err: Error) => {
-      process.stderr.write(`[worker] Job error: ${err.message}\n`);
+      process.stderr.write(`[worker] Job error: ${err.message}\n${err.stack}\n`);
     });
   } else if (cmd.cmd === "check") {
     if (isRunning) {
@@ -92,14 +117,21 @@ async function saveMessageRecord(
   cmd: WorkerStartCmd,
   data: { username: string; messageSent?: string; status: "sent" | "failed" | "skipped"; tokenCount?: number; errorReason?: string },
 ): Promise<void> {
+  const url = `${cmd.serverUrl}/automation/message`;
   try {
-    await fetch(`${cmd.serverUrl}/automation/message`, {
+    const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${cmd.authToken}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAuthToken(cmd)}` },
       body: JSON.stringify({ jobId: cmd.jobId, ...data }),
     });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      process.stderr.write(`[worker:saveMessageRecord] HTTP ${response.status} for username=${data.username} status=${data.status} — ${body}\n`);
+    } else {
+      process.stderr.write(`[worker:saveMessageRecord] saved username=${data.username} status=${data.status}\n`);
+    }
   } catch (err) {
-    process.stderr.write(`[worker] Failed to save message record: ${(err as Error).message}\n`);
+    process.stderr.write(`[worker:saveMessageRecord] NETWORK ERROR username=${data.username}: ${(err as Error).message}\n`);
   }
 }
 
@@ -107,18 +139,23 @@ async function saveJobLog(
   cmd: WorkerStartCmd | WorkerCheckCmd,
   data: { level?: "info" | "warn" | "error"; message: string },
 ): Promise<void> {
+  const url = `${cmd.serverUrl}/automation/log`;
   try {
-    await fetch(`${cmd.serverUrl}/automation/log`, {
+    const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${cmd.authToken}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAuthToken(cmd)}` },
       body: JSON.stringify({
         jobId: cmd.jobId,
         level: data.level ?? "info",
         message: data.message,
       }),
     });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      process.stderr.write(`[worker:saveJobLog] HTTP ${response.status} — ${body}\n`);
+    }
   } catch (err) {
-    process.stderr.write(`[worker] Failed to save job log: ${(err as Error).message}\n`);
+    process.stderr.write(`[worker:saveJobLog] NETWORK ERROR: ${(err as Error).message}\n`);
   }
 }
 
@@ -126,10 +163,12 @@ async function consumeMessageQuota(
   cmd: WorkerStartCmd,
   username: string,
 ): Promise<{ allowed: boolean; remaining?: number; error?: string }> {
+  const url = `${cmd.serverUrl}/automation/consume-message-quota`;
+  process.stderr.write(`[worker:quota] POST ${url} username=${username} jobId=${cmd.jobId}\n`);
   try {
-    const response = await fetch(`${cmd.serverUrl}/automation/consume-message-quota`, {
+    const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${cmd.authToken}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAuthToken(cmd)}` },
       body: JSON.stringify({
         jobId: cmd.jobId,
         username,
@@ -137,13 +176,17 @@ async function consumeMessageQuota(
       }),
     });
 
+    process.stderr.write(`[worker:quota] response status=${response.status} ok=${response.ok} username=${username}\n`);
+
     if (response.ok) {
       const data = await response.json() as { remaining?: number };
+      process.stderr.write(`[worker:quota] ALLOWED remaining=${data.remaining ?? "(n/a)"} username=${username}\n`);
       return { allowed: true, remaining: data.remaining };
     }
 
     const data = await response.json().catch(() => ({} as { error?: string }));
     if (response.status === 429) {
+      process.stderr.write(`[worker:quota] DENIED (429 quota exhausted) username=${username} error=${data.error ?? "(none)"}\n`);
       return {
         allowed: false,
         remaining: 0,
@@ -151,11 +194,13 @@ async function consumeMessageQuota(
       };
     }
 
+    process.stderr.write(`[worker:quota] DENIED (HTTP ${response.status}) username=${username} error=${data.error ?? "(none)"}\n`);
     return {
       allowed: false,
       error: data.error ?? `Quota API returned ${response.status}`,
     };
   } catch (err) {
+    process.stderr.write(`[worker:quota] NETWORK ERROR username=${username} error=${(err as Error).message}\n`);
     return {
       allowed: false,
       error: `Quota API call failed: ${(err as Error).message}`,
@@ -199,41 +244,85 @@ async function runJob(cmd: WorkerStartCmd): Promise<void> {
   stopRequested = false;
   let quotaReached = false;
 
+  process.stderr.write(
+    `[worker:runJob] START accountId=${cmd.accountId} jobId=${cmd.jobId} ` +
+    `sessionDir=${cmd.sessionDir} targets=${cmd.targets.length} ` +
+    `serverUrl=${cmd.serverUrl} defaultMessage="${cmd.defaultMessage?.slice(0, 40)}..." ` +
+    `minDelayMs=${cmd.minDelayMs} maxDelayMs=${cmd.maxDelayMs}\n`
+  );
+
   emit({ type: "status", accountId: cmd.accountId, status: "running", jobId: cmd.jobId });
+
+  if (cmd.targets.length === 0) {
+    process.stderr.write(`[worker:runJob] WARN: targets array is empty — nothing to do\n`);
+    emit({ type: "log", accountId: cmd.accountId, level: "warn", message: "No targets provided — job has nothing to do.", jobId: cmd.jobId });
+  }
 
   const client = new InstagramClient({ sessionDir: cmd.sessionDir, headless: true });
 
+  process.stderr.write(`[worker:runJob] created InstagramClient headless=true sessionDir=${cmd.sessionDir}\n`);
+
+  emit({
+    type: "stage", accountId: cmd.accountId, jobId: cmd.jobId, workflow: "send",
+    stageId: "init_browser", stageLabel: "Launching browser", stageState: "active",
+    stageDetail: "Starting headless Chromium and loading session", stageUsername: "",
+  });
+
+  process.stderr.write(`[worker:runJob] calling client.init() with 30s timeout...\n`);
+
   try {
-    await client.init();
+    await Promise.race([
+      client.init(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Browser launch timed out after 30 seconds. Check Accounts and re-login.")), 30_000)
+      ),
+    ]);
+    process.stderr.write(`[worker:runJob] client.init() SUCCEEDED\n`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`[worker:runJob] client.init() FAILED: ${message}\n`);
+    emit({
+      type: "stage", accountId: cmd.accountId, jobId: cmd.jobId, workflow: "send",
+      stageId: "init_browser", stageLabel: "Launching browser", stageState: "error",
+      stageDetail: message, stageUsername: "",
+    });
     emit({ type: "log", accountId: cmd.accountId, level: "error", message: `Session error: ${message}`, jobId: cmd.jobId });
     emit({ type: "status", accountId: cmd.accountId, status: "error", jobId: cmd.jobId });
+    await client.close().catch(() => undefined);
     isRunning = false;
     return;
   }
 
+  emit({
+    type: "stage", accountId: cmd.accountId, jobId: cmd.jobId, workflow: "send",
+    stageId: "init_browser", stageLabel: "Launching browser", stageState: "done",
+    stageDetail: "Browser ready, session loaded", stageUsername: "",
+  });
+  process.stderr.write(`[worker:runJob] entering target loop: ${cmd.targets.length} target(s)\n`);
   emit({ type: "log", accountId: cmd.accountId, level: "info", message: "Session loaded — starting automation.", jobId: cmd.jobId });
 
-  // Derive sender name from accountId stored username (just for sign-off)
   const senderName = "Me"; // server could pass this if needed
-  const personalizerConfig = { serverUrl: cmd.serverUrl, authToken: cmd.authToken };
-
   let sent = 0;
   let failed = 0;
 
   for (const [i, target] of cmd.targets.entries()) {
-    if (stopRequested) break;
+    if (stopRequested) {
+      process.stderr.write(`[worker:runJob] stop requested before target[${i}] — breaking loop\n`);
+      break;
+    }
 
     const username = target.username.trim();
+    process.stderr.write(`[worker:runJob] target[${i + 1}/${cmd.targets.length}] username=${username} — checking quota...\n`);
     const quota = await consumeMessageQuota(cmd, username);
     if (!quota.allowed) {
       quotaReached = true;
+      process.stderr.write(`[worker:runJob] quota DENIED for username=${username} — stopping loop. reason: ${quota.error ?? "(none)"}\n`);
       emit({ type: "log", accountId: cmd.accountId, level: "warn", message: quota.error ?? "Daily message limit reached.", jobId: cmd.jobId });
       await saveJobLog(cmd, { level: "warn", message: quota.error ?? "Daily message limit reached." });
       break;
     }
 
+    process.stderr.write(`[worker:runJob] quota OK for username=${username} remaining=${quota.remaining ?? "(n/a)"} — processing target\n`);
     emit({ type: "log", accountId: cmd.accountId, level: "info", message: `[${i + 1}/${cmd.targets.length}] Processing @${username}...`, jobId: cmd.jobId });
     emit({ type: "message_sent", accountId: cmd.accountId, jobId: cmd.jobId, username, messageStatus: "sending" });
 
@@ -269,7 +358,7 @@ async function runJob(cmd: WorkerStartCmd): Promise<void> {
           detail: `Generating AI message for @${username}`,
           username,
         });
-        const personalized = await generatePersonalizedMessage(scrapeResult, senderName, personalizerConfig);
+        const personalized = await generatePersonalizedMessage(scrapeResult, senderName, { serverUrl: cmd.serverUrl, authToken: getAuthToken(cmd) });
         message = personalized.message ?? cmd.defaultMessage;
         tokenCount = personalized.tokenCount;
         emitStage(cmd, {
@@ -329,14 +418,22 @@ async function runJob(cmd: WorkerStartCmd): Promise<void> {
   const finalStatus = stopRequested || quotaReached ? "stopped" : "done";
 
   // Persist the final status to the DB before emitting IPC so the history page reflects reality
+  process.stderr.write(`[worker:runJob] finalizing job jobId=${cmd.jobId} status=${finalStatus} sent=${sent} failed=${failed}\n`);
   try {
-    await fetch(`${cmd.serverUrl}/automation/finalize/${cmd.jobId}`, {
+    const finalizeUrl = `${cmd.serverUrl}/automation/finalize/${cmd.jobId}`;
+    const finalizeRes = await fetch(finalizeUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${cmd.authToken}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAuthToken(cmd)}` },
       body: JSON.stringify({ status: finalStatus }),
     });
+    if (!finalizeRes.ok) {
+      const body = await finalizeRes.text().catch(() => "");
+      process.stderr.write(`[worker:runJob] finalize HTTP ${finalizeRes.status} — ${body}\n`);
+    } else {
+      process.stderr.write(`[worker:runJob] finalize OK jobId=${cmd.jobId}\n`);
+    }
   } catch (err) {
-    process.stderr.write(`[worker] Failed to finalize job: ${(err as Error).message}\n`);
+    process.stderr.write(`[worker:runJob] finalize NETWORK ERROR: ${(err as Error).message}\n`);
   }
 
   emit({ type: "status", accountId: cmd.accountId, status: finalStatus, sent, failed, jobId: cmd.jobId });
@@ -354,11 +451,17 @@ async function runCheck(cmd: WorkerCheckCmd): Promise<void> {
   const client = new InstagramClient({ sessionDir: cmd.sessionDir, headless: true });
 
   try {
-    await client.init();
+    await Promise.race([
+      client.init(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Browser launch timed out after 30 seconds. Check Accounts and re-login.")), 30_000)
+      ),
+    ]);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     emit({ type: "log", accountId: cmd.accountId, level: "error", message: `Session error: ${message}`, jobId: cmd.jobId });
     emit({ type: "status", accountId: cmd.accountId, status: "error", jobId: cmd.jobId });
+    await client.close().catch(() => undefined);
     isRunning = false;
     return;
   }
@@ -417,7 +520,7 @@ async function runCheck(cmd: WorkerCheckCmd): Promise<void> {
       }];
       const response = await fetch(`${cmd.serverUrl}/automation/message-records`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${cmd.authToken}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAuthToken(cmd)}` },
         body: JSON.stringify(payload),
       });
       const responseText = await response.text();

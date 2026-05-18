@@ -36,10 +36,11 @@ export class InstagramClient {
 
   async init(): Promise<void> {
     const userDataDir = path.resolve(this.config.sessionDir);
+    const headless = this.config.headless ?? true;
     fs.mkdirSync(userDataDir, { recursive: true });
 
     this.context = await chromium.launchPersistentContext(userDataDir, {
-      headless: this.config.headless ?? true,
+      headless,
       viewport: { width: 1280, height: 720 },
       locale: "en-US",
     });
@@ -59,8 +60,9 @@ export class InstagramClient {
     await page.waitForTimeout(3_000);
     await this.dismissCookieBanner(page);
 
-    if (await this.isAuthenticated(page)) {
-      console.log("Session valid - already logged in.");
+    const authenticated = await this.isAuthenticated(page);
+
+    if (authenticated) {
       await this.dismissOptionalPrompts(page);
       return;
     }
@@ -72,13 +74,10 @@ export class InstagramClient {
       );
     }
 
-    console.log("Opening Instagram login page - please log in in the browser window...");
     await page.goto("https://www.instagram.com/accounts/login/", { waitUntil: "domcontentloaded" });
     await this.dismissCookieBanner(page);
     await this.waitForManualLogin(page, 5 * 60 * 1_000);
-
     await this.dismissOptionalPrompts(page);
-    console.log("Login detected - Playwright session saved to disk.");
   }
 
   private async waitForManualLogin(page: Page, timeoutMs: number): Promise<void> {
@@ -313,7 +312,6 @@ export class InstagramClient {
         .catch(() => false);
 
       if (!threadOpen) {
-        console.log(`checkConversation @${username}: thread did not open (url=${page.url()})`);
         onProgress?.({ workflow: "analyze", stageId: "open_thread", label: "Opening chat", state: "error", detail: "Thread did not open", username });
         return { seen: false, replied: false };
       }
@@ -629,17 +627,12 @@ export class InstagramClient {
         });
       }
 
-      console.log(
-        `checkConversation @${username}: url=${page.url()} seen=${finalSeen} replied=${replyInfo.replied} preview=${replyInfo.replyPreview ?? "(none)"} scopeTextCount=${replyInfo.scopeTextCount ?? 0}`,
-      );
-
       return {
         seen: finalSeen,
         replied: replyInfo.replied,
         replyPreview: replyInfo.replyPreview,
       };
     } catch (err) {
-      console.warn(`checkConversation @${username}: ${(err as Error).message}`);
       onProgress?.({
         workflow: "analyze",
         stageId: "read_conversation",
@@ -662,9 +655,6 @@ export class InstagramClient {
 
     await fs.promises.writeFile(htmlPath, await page.content(), "utf8");
     await page.screenshot({ path: pngPath, fullPage: true }).catch(() => undefined);
-
-    console.log(`Debug HTML: ${htmlPath}`);
-    console.log(`Debug screenshot: ${pngPath}`);
   }
 
   private async captureCheckDebug(tag: string, details: unknown): Promise<void> {
@@ -674,8 +664,6 @@ export class InstagramClient {
     const stamp = Date.now();
     const jsonPath = path.join(logsDir, `${tag}-${stamp}.json`);
     await fs.promises.writeFile(jsonPath, JSON.stringify(details, null, 2), "utf8");
-
-    console.log(`Debug JSON: ${jsonPath}`);
   }
 
   private requirePage(): Page {

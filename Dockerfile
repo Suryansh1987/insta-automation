@@ -2,6 +2,8 @@ FROM node:20-bookworm-slim AS base
 
 WORKDIR /app
 
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
 COPY package*.json ./
 COPY server/package*.json ./server/
 COPY packages/shared/package*.json ./packages/shared/
@@ -12,6 +14,8 @@ COPY tsconfig.base.json ./
 COPY server ./server
 COPY packages/shared ./packages/shared
 
+RUN npm run build --workspace=@insta-saas/shared
+RUN npm install
 RUN npm run generate --workspace=server
 RUN npm run build --workspace=server
 

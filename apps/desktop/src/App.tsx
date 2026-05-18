@@ -1,75 +1,33 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { SignedIn, SignedOut, SignIn, SignUp, useAuth, useClerk } from "@clerk/clerk-react";
-import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { SignedIn, SignedOut, SignIn, SignUp } from "@clerk/clerk-react";
 import AuthSetup from "./components/AuthSetup";
 import Layout from "./components/Layout";
+import BrandMark from "./components/BrandMark";
 import Dashboard from "./pages/Dashboard";
 import Accounts from "./pages/Accounts";
 import Automation from "./pages/Automation";
 import History from "./pages/History";
-import Logs from "./pages/Logs";
 import Plans from "./pages/Plans";
-
-// ── Debug helpers ─────────────────────────────────────────────────────────────
-
-function rlog(tag: string, msg: string) {
-  const ts = new Date().toISOString().slice(11, 23);
-  const line = `[${ts}] [${tag}] ${msg}`;
-  console.log(line);
-  // Forward to main process persistent log via the bridge the preload exposed
-  (window as unknown as { debugLog?: (...a: unknown[]) => void }).debugLog?.(tag, msg);
-}
-
-function RouteLogger() {
-  const location = useLocation();
-  useEffect(() => {
-    rlog("route", `pathname="${location.pathname}" search="${location.search}" hash="${location.hash}"`);
-    rlog("route", `href="${window.location.href}" origin="${window.location.origin}"`);
-  }, [location]);
-  return null;
-}
-
-function ClerkDebug() {
-  const { isLoaded, isSignedIn, userId } = useAuth();
-  const clerk = useClerk();
-  useEffect(() => {
-    rlog("clerk", `isLoaded=${isLoaded} isSignedIn=${isSignedIn} userId=${userId ?? "null"}`);
-    if (isLoaded) {
-      rlog("clerk", `client.activeSessions.length=${clerk?.client?.activeSessions?.length ?? "?"}`);
-    }
-  }, [isLoaded, isSignedIn, userId, clerk]);
-  return null;
-}
-
-// ── Styles ────────────────────────────────────────────────────────────────────
 
 const authBoxStyle: React.CSSProperties = {
   minHeight: "100vh",
   display: "flex",
+  flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
+  gap: "20px",
   background: "#1a1a2e",
 };
-
-// ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
   return (
     <BrowserRouter>
-      <RouteLogger />
-      <ClerkDebug />
       <Routes>
-        {/*
-          routing="path" + BrowserRouter:
-            Clerk uses React Router's navigate() for multi-step flows
-            (e.g. /sign-in → /sign-in/factor-one) — no full document reload.
-            Full-page reloads (sign-out redirect, browser refresh) are handled
-            by the SPA fallback in main.ts which serves index.html for any path.
-        */}
         <Route
           path="/sign-in/*"
           element={
             <div style={authBoxStyle}>
+              <BrandMark size={216} subtitle="Secure desktop access" />
               <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" fallbackRedirectUrl="/" />
             </div>
           }
@@ -78,12 +36,12 @@ export default function App() {
           path="/sign-up/*"
           element={
             <div style={authBoxStyle}>
+              <BrandMark size={216} subtitle="Create your workspace" />
               <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" fallbackRedirectUrl="/" />
             </div>
           }
         />
 
-        {/* Main app shell */}
         <Route
           path="/*"
           element={
@@ -99,7 +57,6 @@ export default function App() {
                       <Route path="accounts" element={<Accounts />} />
                       <Route path="automation" element={<Automation />} />
                       <Route path="history" element={<History />} />
-                      <Route path="logs" element={<Logs />} />
                       <Route path="plans" element={<Plans />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { ZodError } from "zod";
+import { BillingError } from "../services/billing";
 
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
   if (err instanceof ZodError) {
@@ -7,6 +8,11 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
       error: "Validation error",
       details: err.errors.map((e) => ({ path: e.path.join("."), message: e.message })),
     });
+  }
+
+  if (err instanceof BillingError) {
+    console.error(`[billing-error] ${err.message}`);
+    return res.status(err.statusCode).json({ error: err.message });
   }
 
   if (err instanceof Error) {

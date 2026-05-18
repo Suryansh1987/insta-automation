@@ -8,6 +8,13 @@ const PAID_PLAN_ORDER: Plan[] = ["max", "pro", "free"];
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set<SubscriptionStatus>(["authenticated", "active"]);
 const db = prisma as any;
 
+export class BillingError extends Error {
+  constructor(message: string, public readonly statusCode: number) {
+    super(message);
+    this.name = "BillingError";
+  }
+}
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is required`);
@@ -99,7 +106,15 @@ export async function createRazorpaySubscription(input: {
 
   const payload: any = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error?.description ?? "Failed to create Razorpay subscription.");
+    const description = payload.error?.description ?? "Failed to create Razorpay subscription.";
+    const httpStatus = response.status === 401 ? 502 : 502;
+    console.error(`[billing] Razorpay ${response.status}: ${description}`, payload.error);
+    throw new BillingError(
+      response.status === 401
+        ? "Payment provider authentication failed. Please contact support."
+        : description,
+      httpStatus,
+    );
   }
 
   const subscription = await db.subscription.create({
@@ -140,7 +155,14 @@ export async function fetchRazorpaySubscription(providerSubscriptionId: string) 
   });
   const payload: any = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error?.description ?? "Failed to fetch Razorpay subscription.");
+    const description = payload.error?.description ?? "Failed to fetch Razorpay subscription.";
+    console.error(`[billing] Razorpay ${response.status}: ${description}`, payload.error);
+    throw new BillingError(
+      response.status === 401
+        ? "Payment provider authentication failed. Please contact support."
+        : description,
+      502,
+    );
   }
   return payload;
 }
@@ -205,6 +227,36 @@ export async function attachSuccessfulPayment(input: {
   });
 
   return subscription;
+}
+
+export async function cancelRazorpaySubscription(
+  providerSubscriptionId: string,
+  cancelAtCycleEnd: boolean,
+) {
+  const response = await fetch(
+    `${RAZORPAY_API_BASE}/subscriptions/${providerSubscriptionId}/cancel`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: getBasicAuthHeader(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ cancel_at_cycle_end: cancelAtCycleEnd ? 1 : 0 }),
+    },
+  );
+
+  const payload: any = await response.json();
+  if (!response.ok) {
+    const description = payload.error?.description ?? "Failed to cancel subscription.";
+    console.error(`[billing] Razorpay cancel ${response.status}: ${description}`, payload.error);
+    throw new BillingError(
+      response.status === 401
+        ? "Payment provider authentication failed. Please contact support."
+        : description,
+      502,
+    );
+  }
+  return payload;
 }
 
 export async function reconcileUserPlan(userId: string) {

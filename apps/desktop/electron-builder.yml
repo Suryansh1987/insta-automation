@@ -31,10 +31,16 @@ extraResources:
 
 win:
   target:
-    - target: dir
-  icon: assets/icon.ico
+    - target: nsis
+    - target: portable
   sign: null
   certificateFile: null
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
 
 mac:
   target: dmg

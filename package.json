@@ -12,6 +12,7 @@
     "dev:desktop": "npm run dev --workspace=apps/desktop",
     "dev:worker": "npm run dev --workspace=apps/worker",
     "build:all": "npm run build --workspaces --if-present",
+    "dist:desktop:win": "npm run build --workspace=apps/worker && npm run dist:win --workspace=apps/desktop",
     "db:migrate": "npm run migrate --workspace=server",
     "db:studio": "npm run studio --workspace=server"
   },
