@@ -11,6 +11,18 @@ export interface UserProfile {
   plan: Plan;
 }
 
+export interface MessagingPreferences {
+  senderName: string;
+  tone: string;
+  customPrompt: string;
+}
+
+export interface UpdateMessagingPreferencesRequest {
+  senderName: string;
+  tone: string;
+  customPrompt: string;
+}
+
 export type SubscriptionStatus =
   | "created"
   | "authenticated"
@@ -170,7 +182,9 @@ export interface PersonalizeRequest {
   posts: Array<{ caption: string; likes: number | null; comments: number | null }>;
   bio: string;
   profileScreenshot?: string; // base64-encoded PNG
-  senderName: string;
+  senderName?: string;
+  tone?: string;
+  customPrompt?: string;
 }
 
 export interface PersonalizeResponse {

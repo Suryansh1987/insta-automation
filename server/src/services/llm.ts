@@ -7,17 +7,28 @@ interface ScrapedPost {
   comments: number | null;
 }
 
-const SYSTEM_PROMPT = `You are writing a warm, genuine Instagram DM on behalf of a real person reaching out to another creator.
+function buildSystemPrompt(tone?: string, customPrompt?: string): string {
+  const toneInstruction = tone?.trim()
+    ? `- Use a ${tone.trim()} tone while still sounding natural and human`
+    : "- Use a warm, genuine, conversational tone";
+
+  const extraPrompt = customPrompt?.trim()
+    ? `\nAdditional user instructions:\n${customPrompt.trim()}`
+    : "";
+
+  return `You are writing a genuine Instagram DM on behalf of a real person reaching out to another creator.
 
 Rules:
-- 3–5 short paragraphs, conversational tone, no em-dashes
+- 3-5 short paragraphs
+${toneInstruction}
 - Open by referencing a specific insight or phrase from one of their recent posts
-- Show you actually understood the content — quote or closely paraphrase a detail
+- Show you actually understood the content and quote or closely paraphrase a detail
 - Add a brief personal reaction ("This shifted something for me", "I hadn't thought of it that way", etc.)
-- Close with gratitude and sign off with just the sender's first name
-- Do NOT use generic openers like "I love your content" or "great post"
-- Do NOT use hashtags, emojis, or sales language
-- Do NOT mention following, collabs, or any ask — this is purely a genuine appreciation message`;
+- Close with gratitude and sign off using the provided sender name exactly as written
+- Do not use generic openers like "I love your content" or "great post"
+- Do not use hashtags, emojis, or sales language
+- Do not mention following, collabs, or any ask - this is purely a genuine appreciation message${extraPrompt}`;
+}
 
 function pickBestPost(posts: ScrapedPost[]): ScrapedPost | null {
   if (posts.length === 0) return null;
@@ -33,6 +44,8 @@ export async function generatePersonalizedMessage(
   bio: string,
   profileScreenshotBase64: string | undefined,
   senderName: string,
+  tone?: string,
+  customPrompt?: string,
 ): Promise<{ message: string | null; tokenCount: number }> {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
   const apiKey = process.env.AZURE_OPENAI_API_KEY;
@@ -56,7 +69,7 @@ export async function generatePersonalizedMessage(
     : "";
 
   const focusBlock = bestPost
-    ? `FOCUS POST (${engagementLabel} — base the message primarily on this one):\n${bestPost.caption}`
+    ? `FOCUS POST (${engagementLabel} - base the message primarily on this one):\n${bestPost.caption}`
     : "";
 
   const contextBlock =
@@ -66,7 +79,7 @@ export async function generatePersonalizedMessage(
 
   const bioLine = bio ? `Their bio: "${bio}"\n\n` : "";
   const screenshotLine = profileScreenshotBase64
-    ? "A screenshot of their profile is attached — use the visual aesthetic, style, and setting to enrich the message.\n\n"
+    ? "A screenshot of their profile is attached - use the visual aesthetic, style, and setting to enrich the message.\n\n"
     : "";
 
   const textPrompt = `Write a hyper-personalized Instagram DM based on the posts below.\n${bioLine}${screenshotLine}${focusBlock}\n${contextBlock}\n\nSign off with the name: ${senderName}`;
@@ -86,7 +99,7 @@ export async function generatePersonalizedMessage(
     const response = await client.chat.completions.create({
       model: deployment,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: buildSystemPrompt(tone, customPrompt) },
         { role: "user", content: userContent },
       ],
       max_tokens: 400,

@@ -64,6 +64,7 @@ export function defaultSendStages(): WorkflowStageSnapshot[] {
     { id: "check_bio",           label: "Checking description",     state: "pending" },
     { id: "generate_message",    label: "Creating message",         state: "pending" },
     { id: "send_message",        label: "Sending message",          state: "pending" },
+    { id: "wait_delay",          label: "Waiting before next message", state: "pending" },
   ];
 }
 
@@ -163,7 +164,7 @@ export const useAutomationStore = create<AutomationState>()((set, get) => ({
         workflowStages: defaultSendStages(),
         workflowTarget: usernames[0] ?? "",
         workerLogs: [],
-        statusText: "Job started. Headless automation is running in the background.",
+        statusText: "Job started. Automation is running.",
       };
       const jobs = { ...s.jobs, [accountId]: newJob };
       const runningAccounts = new Set([...s.runningAccounts, accountId]);
@@ -217,6 +218,7 @@ export const useAutomationStore = create<AutomationState>()((set, get) => ({
       }
 
       if (msg.type === "message_sent" && msg.username) {
+        const isSending = msg.messageStatus === "sending";
         updated = {
           ...updated,
           targetRows: updated.targetRows.map((row) =>
@@ -224,6 +226,7 @@ export const useAutomationStore = create<AutomationState>()((set, get) => ({
               ? { ...row, status: (msg.messageStatus as TargetStatus) ?? row.status, messageSent: msg.messageSent ?? row.messageSent }
               : row,
           ),
+          ...(isSending ? { workflowStages: defaultSendStages(), workflowTarget: msg.username } : {}),
         };
       }
 

@@ -4,7 +4,8 @@ import api from "../api/client";
 import { useUser, useAuth } from "@clerk/clerk-react";
 import { usePlanStore } from "../store/plan";
 import { PLAN_LIMITS } from "@insta-saas/shared";
-import type { WorkerCheckCmd, WorkerMessage } from "@insta-saas/shared";
+import { toast } from "../store/toast";
+import type { MessagingPreferences, UpdateMessagingPreferencesRequest, WorkerCheckCmd, WorkerMessage } from "@insta-saas/shared";
 import WorkflowOverlay from "../components/ui/workflow-overlay";
 import { applyStageMessage, createWorkflowStages, type WorkflowStageView } from "../components/ui/workflow-stage";
 import {
@@ -22,6 +23,8 @@ interface AnalyzeRecord {
   id: string; username: string; messageSent: string | null;
   status: string; seen: boolean; replied: boolean; replyPreview: string | null; sentAt: string;
 }
+
+const emptyPreferences: MessagingPreferences = { senderName: "", tone: "", customPrompt: "" };
 
 const SERVER_URL = ((import.meta.env.VITE_BACKEND_URL as string) ?? "http://localhost:3001").replace(/\/$/, "");
 const JOBS_PER_PAGE = 5;
@@ -49,6 +52,9 @@ export default function Dashboard() {
   const [todayJobs, setTodayJobs] = useState<TodayJob[]>([]);
   const [jobsTotal, setJobsTotal] = useState(0);
   const [loading,   setLoading]   = useState(true);
+  const [preferences, setPreferences] = useState<MessagingPreferences>(emptyPreferences);
+  const [preferencesLoading, setPreferencesLoading] = useState(true);
+  const [preferencesSaving, setPreferencesSaving] = useState(false);
 
   // Filters
   const [chartDays, setChartDays]   = useState<7 | 14 | 30>(7);
@@ -79,7 +85,20 @@ export default function Dashboard() {
     }
   }
 
-  useEffect(() => { fetchData(); }, []);
+  async function fetchPreferences() {
+    setPreferencesLoading(true);
+    try {
+      const { data } = await api.get<{ preferences: MessagingPreferences }>("/automation/preferences");
+      setPreferences(data.preferences ?? emptyPreferences);
+    } finally {
+      setPreferencesLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchData();
+    fetchPreferences();
+  }, []);
 
   function applyChartDays(d: 7 | 14 | 30) {
     setChartDays(d);
@@ -106,6 +125,28 @@ export default function Dashboard() {
       setAnalyzeRecords(data.job.messageRecords ?? []);
     } finally {
       setAnalyzeLoading(false);
+    }
+  }
+
+  function patchPreferences(patch: Partial<MessagingPreferences>) {
+    setPreferences((current) => ({ ...current, ...patch }));
+  }
+
+  async function savePreferences() {
+    setPreferencesSaving(true);
+    try {
+      const payload: UpdateMessagingPreferencesRequest = {
+        senderName: preferences.senderName,
+        tone: preferences.tone,
+        customPrompt: preferences.customPrompt,
+      };
+      const { data } = await api.patch<{ preferences: MessagingPreferences }>("/automation/preferences", payload);
+      setPreferences(data.preferences ?? emptyPreferences);
+      toast.success("Messaging preferences saved.");
+    } catch (err: any) {
+      toast.error(err.response?.data?.error ?? "Failed to save messaging preferences.");
+    } finally {
+      setPreferencesSaving(false);
     }
   }
 
@@ -147,6 +188,77 @@ export default function Dashboard() {
             </>
           )}
         </div>
+
+        <ChartCard
+          title="Messaging Preferences"
+          sub="Set the name, tone, and AI instructions used for personalized DMs."
+          action={
+            <button
+              onClick={savePreferences}
+              disabled={preferencesLoading || preferencesSaving}
+              style={{
+                ...ghostBtn,
+                background: preferencesSaving ? "var(--bg-canvas)" : "var(--accent-soft)",
+                border: `1px solid ${preferencesSaving ? "var(--line)" : "var(--accent-line)"}`,
+                color: preferencesSaving ? "var(--fg-4)" : "var(--accent)",
+                cursor: preferencesLoading || preferencesSaving ? "default" : "pointer",
+              }}
+            >
+              {preferencesSaving ? "Saving..." : "Save preferences"}
+            </button>
+          }
+        >
+          {preferencesLoading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <Sk w={110} h={12} />
+                <Sk w="100%" h={40} r={8} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <Sk w={90} h={12} />
+                <Sk w="100%" h={40} r={8} />
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 8 }}>
+                <Sk w={140} h={12} />
+                <Sk w="100%" h={88} r={8} />
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div>
+                <label style={fieldLabel}>Your Name</label>
+                <input
+                  value={preferences.senderName}
+                  onChange={(e) => patchPreferences({ senderName: e.target.value })}
+                  placeholder="Warmly, Aayush"
+                  style={fieldInput}
+                />
+                <div style={fieldHint}>This name is used in the DM sign-off.</div>
+              </div>
+              <div>
+                <label style={fieldLabel}>Tone</label>
+                <input
+                  value={preferences.tone}
+                  onChange={(e) => patchPreferences({ tone: e.target.value })}
+                  placeholder="Warm, thoughtful, friendly"
+                  style={fieldInput}
+                />
+                <div style={fieldHint}>Example: warm, playful, confident, softly professional.</div>
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={fieldLabel}>Custom Prompt</label>
+                <textarea
+                  value={preferences.customPrompt}
+                  onChange={(e) => patchPreferences({ customPrompt: e.target.value })}
+                  placeholder="Write like a real human, keep it short, and avoid sounding salesy."
+                  rows={4}
+                  style={{ ...fieldInput, resize: "vertical" }}
+                />
+                <div style={fieldHint}>Extra instructions for AI-personalized messages.</div>
+              </div>
+            </div>
+          )}
+        </ChartCard>
 
         {/* Charts */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 28 }}>
@@ -587,3 +699,16 @@ function MsgBadge({ status }: { status: string }) {
 const cardS: React.CSSProperties = { background: "var(--bg-card)", borderRadius: "var(--radius-md)", padding: "18px 20px", border: "1px solid var(--line)" };
 const ghostBtn: React.CSSProperties = { padding: "6px 14px", background: "none", border: "1px solid var(--line-hi)", borderRadius: "var(--radius-sm)", color: "var(--fg-2)", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-body)" };
 const pgBtn: React.CSSProperties = { padding: "4px 10px", background: "var(--bg-canvas)", color: "var(--fg-3)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", fontSize: 12, fontFamily: "var(--font-body)", cursor: "pointer" };
+const fieldLabel: React.CSSProperties = { display: "block", marginBottom: 6, fontSize: 12, fontWeight: 700, color: "var(--fg-2)" };
+const fieldHint: React.CSSProperties = { marginTop: 5, fontSize: 11, color: "var(--fg-4)" };
+const fieldInput: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "10px 12px",
+  background: "var(--bg-input)",
+  color: "var(--fg)",
+  border: "1px solid var(--line-hi)",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 13,
+  fontFamily: "var(--font-body)",
+};

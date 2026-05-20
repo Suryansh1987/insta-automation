@@ -6,7 +6,9 @@
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\packages\\\\shared\\\\src\\\\types\" | ForEach-Object { $_.Name })",
       "PowerShell(cmd /c \"dir /b C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\packages\\\\shared\\\\src && echo --- && dir /b C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\packages\\\\shared\\\\src\\\\types\")",
       "PowerShell(cmd /c \"dir /b C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\node_modules\\\\@clerk 2>nul || echo NOT_FOUND\")",
-      "PowerShell(cmd /c \"findstr /m \"\"Appearance\"\" C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\node_modules\\\\@clerk\\\\clerk-react\\\\dist\\\\index.d.ts 2>nul && echo FOUND || echo NOT_IN_INDEX\")"
+      "PowerShell(cmd /c \"findstr /m \"\"Appearance\"\" C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\node_modules\\\\@clerk\\\\clerk-react\\\\dist\\\\index.d.ts 2>nul && echo FOUND || echo NOT_IN_INDEX\")",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\apps\\\\desktop\\\\release-build\" -File | Select-Object Name, @{N=\"SizeMB\";E={[math]::Round\\($_.Length/1MB,1\\)}})",
+      "Bash(explorer.exe C:\\\\Users\\\\KIIT\\\\Documents\\\\insta-mcp\\\\insta-saas\\\\apps\\\\desktop\\\\release-build *)"
     ]
   }
 }

@@ -258,14 +258,14 @@ async function runJob(cmd: WorkerStartCmd): Promise<void> {
     emit({ type: "log", accountId: cmd.accountId, level: "warn", message: "No targets provided — job has nothing to do.", jobId: cmd.jobId });
   }
 
-  const client = new InstagramClient({ sessionDir: cmd.sessionDir, headless: true });
+  const client = new InstagramClient({ sessionDir: cmd.sessionDir, headless: false });
 
-  process.stderr.write(`[worker:runJob] created InstagramClient headless=true sessionDir=${cmd.sessionDir}\n`);
+  process.stderr.write(`[worker:runJob] created InstagramClient headless=false sessionDir=${cmd.sessionDir}\n`);
 
   emit({
     type: "stage", accountId: cmd.accountId, jobId: cmd.jobId, workflow: "send",
     stageId: "init_browser", stageLabel: "Launching browser", stageState: "active",
-    stageDetail: "Starting headless Chromium and loading session", stageUsername: "",
+    stageDetail: "Starting Chromium and loading session", stageUsername: "",
   });
 
   process.stderr.write(`[worker:runJob] calling client.init() with 30s timeout...\n`);
@@ -301,7 +301,6 @@ async function runJob(cmd: WorkerStartCmd): Promise<void> {
   process.stderr.write(`[worker:runJob] entering target loop: ${cmd.targets.length} target(s)\n`);
   emit({ type: "log", accountId: cmd.accountId, level: "info", message: "Session loaded — starting automation.", jobId: cmd.jobId });
 
-  const senderName = "Me"; // server could pass this if needed
   let sent = 0;
   let failed = 0;
 
@@ -358,7 +357,7 @@ async function runJob(cmd: WorkerStartCmd): Promise<void> {
           detail: `Generating AI message for @${username}`,
           username,
         });
-        const personalized = await generatePersonalizedMessage(scrapeResult, senderName, { serverUrl: cmd.serverUrl, authToken: getAuthToken(cmd) });
+        const personalized = await generatePersonalizedMessage(scrapeResult, { serverUrl: cmd.serverUrl, authToken: getAuthToken(cmd) });
         message = personalized.message ?? cmd.defaultMessage;
         tokenCount = personalized.tokenCount;
         emitStage(cmd, {
@@ -408,8 +407,19 @@ async function runJob(cmd: WorkerStartCmd): Promise<void> {
 
     if (i < cmd.targets.length - 1 && !stopRequested) {
       const delay = randomDelayMs(cmd.minDelayMs, cmd.maxDelayMs);
-      emit({ type: "log", accountId: cmd.accountId, level: "info", message: `Waiting ${(delay / 1000).toFixed(0)}s before next message...`, jobId: cmd.jobId });
+      const delaySec = Math.round(delay / 1000);
+      emit({ type: "log", accountId: cmd.accountId, level: "info", message: `Waiting ${delaySec}s before next message...`, jobId: cmd.jobId });
+      emit({
+        type: "stage", accountId: cmd.accountId, jobId: cmd.jobId, workflow: "send",
+        stageId: "wait_delay", stageLabel: "Waiting before next message",
+        stageState: "active", stageDetail: `Pausing for ${delaySec}s to avoid rate limits`, stageUsername: "",
+      });
       await sleep(delay);
+      emit({
+        type: "stage", accountId: cmd.accountId, jobId: cmd.jobId, workflow: "send",
+        stageId: "wait_delay", stageLabel: "Waiting before next message",
+        stageState: "done", stageDetail: `Resumed after ${delaySec}s`, stageUsername: "",
+      });
     }
   }
 

@@ -8,7 +8,6 @@ export interface PersonalizerConfig {
 
 export async function generatePersonalizedMessage(
   scrapeResult: ScrapeResult,
-  senderName: string,
   config: PersonalizerConfig,
 ): Promise<{ message: string | null; tokenCount: number }> {
   const { posts, bio, profileScreenshot } = scrapeResult;
@@ -17,7 +16,6 @@ export async function generatePersonalizedMessage(
   const body: PersonalizeRequest = {
     posts,
     bio,
-    senderName,
     profileScreenshot: profileScreenshot?.toString("base64"),
   };
 

@@ -24,6 +24,22 @@ const startSchema = z
 
 const MAX_CONCURRENT_JOBS = 2;
 
+function normalizePreference(value: string | null | undefined): string {
+  return value?.trim() ?? "";
+}
+
+function toMessagingPreferences(user: {
+  messageSenderName: string | null;
+  messageTone: string | null;
+  messagePrompt: string | null;
+}) {
+  return {
+    senderName: normalizePreference(user.messageSenderName),
+    tone: normalizePreference(user.messageTone),
+    customPrompt: normalizePreference(user.messagePrompt),
+  };
+}
+
 automationRouter.post("/start", async (req, res, next) => {
   try {
     const r = req as unknown as AuthRequest;
@@ -227,6 +243,55 @@ automationRouter.post("/finalize/:jobId", async (req, res, next) => {
   }
 });
 
+automationRouter.get("/preferences", async (req, res, next) => {
+  try {
+    const r = req as unknown as AuthRequest;
+    const user = await prisma.user.findUnique({
+      where: { id: r.userId },
+      select: {
+        messageSenderName: true,
+        messageTone: true,
+        messagePrompt: true,
+      },
+    });
+
+    if (!user) return res.status(404).json({ error: "User not found." });
+
+    res.json({ preferences: toMessagingPreferences(user) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+automationRouter.patch("/preferences", async (req, res, next) => {
+  try {
+    const r = req as unknown as AuthRequest;
+    const body = z.object({
+      senderName: z.string().max(80).default(""),
+      tone: z.string().max(120).default(""),
+      customPrompt: z.string().max(4000).default(""),
+    }).parse(req.body);
+
+    const updatedUser = await prisma.user.update({
+      where: { id: r.userId },
+      data: {
+        messageSenderName: body.senderName.trim() || null,
+        messageTone: body.tone.trim() || null,
+        messagePrompt: body.customPrompt.trim() || null,
+      },
+      select: {
+        messageSenderName: true,
+        messageTone: true,
+        messagePrompt: true,
+      },
+    });
+
+    res.json({ preferences: toMessagingPreferences(updatedUser) });
+  } catch (err) {
+    next(err);
+  }
+});
+
 automationRouter.post("/personalize", async (req, res, next) => {
   try {
     const personalizeSchema = z.object({
@@ -239,10 +304,31 @@ automationRouter.post("/personalize", async (req, res, next) => {
       ),
       bio: z.string(),
       profileScreenshot: z.string().optional(),
-      senderName: z.string().min(1),
+      senderName: z.string().optional(),
+      tone: z.string().optional(),
+      customPrompt: z.string().optional(),
     });
-    const { posts, bio, profileScreenshot, senderName } = personalizeSchema.parse(req.body);
-    const result = await generatePersonalizedMessage(posts, bio, profileScreenshot, senderName);
+    const r = req as unknown as AuthRequest;
+    const { posts, bio, profileScreenshot, senderName, tone, customPrompt } = personalizeSchema.parse(req.body);
+
+    const user = await prisma.user.findUnique({
+      where: { id: r.userId },
+      select: {
+        messageSenderName: true,
+        messageTone: true,
+        messagePrompt: true,
+      },
+    });
+
+    const preferences = user ? toMessagingPreferences(user) : { senderName: "", tone: "", customPrompt: "" };
+    const result = await generatePersonalizedMessage(
+      posts,
+      bio,
+      profileScreenshot,
+      senderName?.trim() || preferences.senderName || "Me",
+      tone?.trim() || preferences.tone || undefined,
+      customPrompt?.trim() || preferences.customPrompt || undefined,
+    );
     res.json({ message: result.message, tokenCount: result.tokenCount });
   } catch (err) {
     next(err);
