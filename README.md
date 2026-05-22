@@ -244,7 +244,3 @@ This project is intended for educational and automation workflow purposes. Users
 - Inbox management system
 
 ---
-
-# 📜 License
-
-MIT License
