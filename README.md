@@ -119,7 +119,8 @@ instaflow/
 
 ## Dashboard
 
-<img width="1729" height="852" alt="Screenshot 2026-05-22 194241" src="https://github.com/user-attachments/assets/0a18e94c-850e-4996-8ac9-cc07e1d3d1b1" />
+<img width="1729" height="852" alt="Screenshot 2026-05-22 194241" src="https://github.com/user-attachments/assets/133171de-8b3f-4a08-9606-06f05f26a957" />
+
 
 
 
