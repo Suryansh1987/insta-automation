@@ -164,7 +164,7 @@ export const useAutomationStore = create<AutomationState>()((set, get) => ({
         workflowStages: defaultSendStages(),
         workflowTarget: usernames[0] ?? "",
         workerLogs: [],
-        statusText: "Job started. Automation is running.",
+        statusText: "Message sending started.",
       };
       const jobs = { ...s.jobs, [accountId]: newJob };
       const runningAccounts = new Set([...s.runningAccounts, accountId]);
@@ -185,7 +185,7 @@ export const useAutomationStore = create<AutomationState>()((set, get) => ({
       running.delete(accountId);
       const jobs = {
         ...s.jobs,
-        [accountId]: { ...(s.jobs[accountId] ?? emptyJob()), statusText: "Stop signal sent." },
+        [accountId]: { ...(s.jobs[accountId] ?? emptyJob()), statusText: "Stopping now..." },
       };
       const next: AutomationState = {
         ...s,
@@ -243,15 +243,18 @@ export const useAutomationStore = create<AutomationState>()((set, get) => ({
         running.delete(accountId);
         updated = {
           ...updated,
-          statusText: `Job ${msg.status}. Sent: ${msg.sent ?? updated.sent}, Failed: ${msg.failed ?? updated.failed}`,
+          statusText:
+            msg.status === "done"
+              ? `Finished. Sent: ${msg.sent ?? updated.sent}, Not sent: ${msg.failed ?? updated.failed}`
+              : msg.status === "stopped"
+                ? `Stopped. Sent: ${msg.sent ?? updated.sent}, Not sent: ${msg.failed ?? updated.failed}`
+                : `Something went wrong. Sent: ${msg.sent ?? updated.sent}, Not sent: ${msg.failed ?? updated.failed}`,
         };
         const jobs = { ...s.jobs, [accountId]: updated };
         const next: AutomationState = {
           ...s,
           runningAccounts: running,
           jobs,
-          sent: msg.sent ?? updated.sent,
-          failed: msg.failed ?? updated.failed,
           ...legacyFields(jobs, s.lastStartedAccountId),
         };
         savePersisted(next);

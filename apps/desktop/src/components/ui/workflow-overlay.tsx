@@ -27,7 +27,7 @@ export default function WorkflowOverlay({
         <div className="workflow-panel__hero">
           <BoxLoader />
           <div>
-            <div className="workflow-panel__eyebrow">Background Workflow</div>
+            <div className="workflow-panel__eyebrow">Working In The Background</div>
             <h3 className="workflow-panel__title">{title}</h3>
             <p className="workflow-panel__subtitle">{subtitle}</p>
           </div>

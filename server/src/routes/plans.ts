@@ -117,16 +117,11 @@ plansRouter.post("/subscribe", async (req, res, next) => {
     });
 
     if (existing?.shortUrl) {
-      // Verify the existing subscription belongs to the current Razorpay account
-      // (it may have been created with live credentials when we're now in test mode or vice versa)
-      // Also confirm it is still in a checkout-able state — subscriptions with expire_by
-      // become "halted" after 30 min and can no longer accept payment.
       const CHECKOUTABLE_STATUSES = new Set(["created", "authenticated", "pending"]);
       let existingIsValid = false;
       try {
         const providerSub = await fetchRazorpaySubscription(existing.providerSubscriptionId);
         existingIsValid = CHECKOUTABLE_STATUSES.has(providerSub.status);
-        // Keep local status in sync so future queries reflect reality
         if (providerSub.status !== existing.status) {
           await syncSubscriptionFromProvider(providerSub);
         }

@@ -57,10 +57,6 @@ export function getRazorpayPublicConfig() {
   };
 }
 
-export function getSubscriptionCheckoutExpireBy(): number {
-  return Math.floor(Date.now() / 1000) + 30 * 60;
-}
-
 export function verifyRazorpaySignature(input: string, signature: string, secret: string): boolean {
   const expected = crypto.createHmac("sha256", secret).update(input).digest("hex");
   if (expected.length !== signature.length) return false;
@@ -94,7 +90,6 @@ export async function createRazorpaySubscription(input: {
       total_count: totalCount,
       quantity: 1,
       customer_notify: true,
-      expire_by: getSubscriptionCheckoutExpireBy(),
       notes: {
         userId: input.userId,
         userEmail: input.email,

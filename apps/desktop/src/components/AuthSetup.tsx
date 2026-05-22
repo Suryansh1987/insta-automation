@@ -11,7 +11,7 @@ export default function AuthSetup({ children }: { children: React.ReactNode }) {
   const clearPlan = usePlanStore((s) => s.clear);
 
   useEffect(() => {
-    setAuthTokenGetter(() => getToken());
+    setAuthTokenGetter(() => getToken({ skipCache: true }));
   }, [getToken]);
 
   useEffect(() => {

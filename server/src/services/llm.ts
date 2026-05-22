@@ -10,24 +10,23 @@ interface ScrapedPost {
 function buildSystemPrompt(tone?: string, customPrompt?: string): string {
   const toneInstruction = tone?.trim()
     ? `- Use a ${tone.trim()} tone while still sounding natural and human`
-    : "- Use a warm, genuine, conversational tone";
+    : "- Sound like a curious, real person — not a fan account";
 
   const extraPrompt = customPrompt?.trim()
     ? `\nAdditional user instructions:\n${customPrompt.trim()}`
     : "";
 
-  return `You are writing a genuine Instagram DM on behalf of a real person reaching out to another creator.
+  return `You are writing a first Instagram DM on behalf of a real person. The goal is to get a reply by combining a genuine specific compliment with a question that makes them want to respond.
 
-Rules:
-- 3-5 short paragraphs
+Structure — two short paragraphs:
+Paragraph 1 (compliment): A specific, genuine compliment referencing ONE concrete detail from their posts — a phrase they used, a technique, a visual choice, something that stood out. Show you actually paid attention. Never say "love your content", "great post", "amazing" — it must be tied to something specific they did.
+Paragraph 2 (question): A single genuine question about THEIR experience, process, or thinking behind that specific thing. It must feel like innocent curiosity from a fan/admirer — never like you need something from them, never like you're about to pitch or buy something. It should be the kind of question a curious follower would ask, not a potential client or partner.
+
+Additional rules:
 ${toneInstruction}
-- Open by referencing a specific insight or phrase from one of their recent posts
-- Show you actually understood the content and quote or closely paraphrase a detail
-- Add a brief personal reaction ("This shifted something for me", "I hadn't thought of it that way", etc.)
-- Close with gratitude and sign off using the provided sender name exactly as written
-- Do not use generic openers like "I love your content" or "great post"
-- Do not use hashtags, emojis, or sales language
-- Do not mention following, collabs, or any ask - this is purely a genuine appreciation message${extraPrompt}`;
+- The two paragraphs should feel connected — the question flows from the compliment
+- No hashtags, no emojis, no selling, no collab asks
+- Sign off with the provided sender name${extraPrompt}`;
 }
 
 function pickBestPost(posts: ScrapedPost[]): ScrapedPost | null {

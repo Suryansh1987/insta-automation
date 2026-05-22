@@ -35,7 +35,7 @@ function AuthPage({ children, subtitle }: { children: React.ReactNode; subtitle:
         width: 500,
         height: 500,
         borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(217,119,87,0.12) 0%, transparent 65%)",
+        background: "radial-gradient(circle, rgba(168,232,64,0.10) 0%, transparent 65%)",
         pointerEvents: "none",
       }} />
       {/* Ambient glow — bottom left */}
@@ -46,7 +46,7 @@ function AuthPage({ children, subtitle }: { children: React.ReactNode; subtitle:
         width: 380,
         height: 380,
         borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(217,119,87,0.07) 0%, transparent 65%)",
+        background: "radial-gradient(circle, rgba(168,232,64,0.06) 0%, transparent 65%)",
         pointerEvents: "none",
       }} />
 
@@ -87,7 +87,7 @@ function AuthPage({ children, subtitle }: { children: React.ReactNode; subtitle:
 
         {/* Footer */}
         <p style={{ margin: 0, fontSize: 11, color: "var(--fg-4)", textAlign: "center" }}>
-          Instagram DM automation — built for scale
+          Send Instagram messages faster, with less manual work
         </p>
       </div>
     </div>

@@ -64,7 +64,7 @@ export default function Plans() {
 
   useEffect(() => {
     loadPlans()
-      .catch(() => setFlash({ text: "Failed to load plans.", type: "error" }))
+      .catch(() => setFlash({ text: "Couldn't load pricing right now.", type: "error" }))
       .finally(() => setLoading(false));
   }, []);
 
@@ -87,13 +87,13 @@ export default function Plans() {
             try {
               await api.post("/plans/verify", response);
               await loadPlans();
-              setFlash({ text: "Payment successful! Your plan has been upgraded.", type: "success" });
+              setFlash({ text: "Payment received. Your plan is now updated.", type: "success" });
             } catch (e: any) {
-              setFlash({ text: e.response?.data?.error ?? "Payment verification failed. Click Refresh status.", type: "error" });
+              setFlash({ text: e.response?.data?.error ?? "Payment was made, but we could not confirm it yet. Click Check payment status.", type: "error" });
             }
           },
           modal: {
-            ondismiss: () => setFlash({ text: "Checkout closed. Click Refresh status if you completed payment.", type: "error" }),
+            ondismiss: () => setFlash({ text: "Payment window closed. If you already paid, click Check payment status.", type: "error" }),
           },
         });
         rzp.open();
@@ -102,11 +102,11 @@ export default function Plans() {
         if (result.error) {
           setFlash({ text: result.error, type: "error" });
         } else {
-          setFlash({ text: `Razorpay checkout opened for ${PLAN_LIMITS[nextPlan].label}. Complete payment there, then click Refresh status.`, type: "success" });
+          setFlash({ text: `Payment page opened for the ${PLAN_LIMITS[nextPlan].label} plan. After paying, click Check payment status.`, type: "success" });
         }
       }
     } catch (err: any) {
-      setFlash({ text: err.response?.data?.error ?? "Failed to start subscription checkout.", type: "error" });
+      setFlash({ text: err.response?.data?.error ?? "Couldn't open the payment step.", type: "error" });
     } finally {
       setStartingPlan(null);
     }
@@ -123,9 +123,9 @@ export default function Plans() {
       setPlan(data.plan);
       setSubscription(data.subscription);
       await loadPlans();
-      setFlash({ text: `Status refreshed. Current plan: ${PLAN_LIMITS[data.plan].label}.`, type: "success" });
+      setFlash({ text: `Payment status checked. Your current plan is ${PLAN_LIMITS[data.plan].label}.`, type: "success" });
     } catch (err: any) {
-      setFlash({ text: err.response?.data?.error ?? "Failed to refresh subscription status.", type: "error" });
+      setFlash({ text: err.response?.data?.error ?? "Couldn't check your payment status.", type: "error" });
     } finally {
       setSyncing(false);
     }
@@ -145,7 +145,7 @@ export default function Plans() {
       setSubscription(data.subscription);
       setFlash({ text: data.message, type: "success" });
     } catch (err: any) {
-      setFlash({ text: err.response?.data?.error ?? "Failed to cancel subscription.", type: "error" });
+      setFlash({ text: err.response?.data?.error ?? "Couldn't cancel your plan.", type: "error" });
     } finally {
       setCancelling(false);
     }
@@ -153,16 +153,6 @@ export default function Plans() {
 
   const canCancel = subscription?.status === "active" || subscription?.status === "authenticated";
   const isTestMode = razorpayKeyId?.startsWith("rzp_test_");
-
-  const statusColor: Record<string, string> = {
-    active: "var(--positive)",
-    authenticated: "var(--positive)",
-    pending: "var(--warning)",
-    created: "var(--warning)",
-    halted: "var(--negative, #e05c5c)",
-    cancelled: "var(--fg-4)",
-    expired: "var(--fg-4)",
-  };
 
   return (
     <>
@@ -173,13 +163,13 @@ export default function Plans() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
           <div>
             <h1 style={{ margin: "0 0 5px", fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, color: "var(--fg)", letterSpacing: "-0.3px" }}>
-              Billing & Plans
+              Pricing & Payments
             </h1>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {loading ? <Skeleton w={160} h={16} /> : (
                 <>
                   <span style={{ fontSize: 13, color: "var(--fg-3)" }}>
-                    Current plan: <strong style={{ color: "var(--accent)" }}>{PLAN_LIMITS[plan].label}</strong>
+                    Your plan: <strong style={{ color: "var(--accent)" }}>{PLAN_LIMITS[plan].label}</strong>
                   </span>
                   {razorpayKeyId && (
                     <span style={{
@@ -198,25 +188,6 @@ export default function Plans() {
           </div>
 
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {canCancel && !showCancelConfirm && (
-              <button
-                onClick={() => setShowCancelConfirm(true)}
-                disabled={cancelling || loading}
-                style={{
-                  padding: "8px 14px", fontSize: 12, fontWeight: 600,
-                  background: "transparent",
-                  color: "var(--fg-3)",
-                  border: "1px solid var(--line)",
-                  borderRadius: "var(--radius-sm)",
-                  cursor: "pointer", fontFamily: "var(--font-body)",
-                  transition: "color 0.15s, border-color 0.15s",
-                }}
-                onMouseEnter={e => { (e.target as HTMLButtonElement).style.color = "var(--negative, #e05c5c)"; (e.target as HTMLButtonElement).style.borderColor = "rgba(220,53,69,0.4)"; }}
-                onMouseLeave={e => { (e.target as HTMLButtonElement).style.color = "var(--fg-3)"; (e.target as HTMLButtonElement).style.borderColor = "var(--line)"; }}
-              >
-                Cancel plan
-              </button>
-            )}
             <button
               onClick={handleSync}
               disabled={syncing || loading || !subscription}
@@ -230,7 +201,7 @@ export default function Plans() {
                 fontFamily: "var(--font-body)",
               }}
             >
-              {syncing ? "Refreshing…" : "Refresh status"}
+              {syncing ? "Checking..." : "Check payment status"}
             </button>
           </div>
         </div>
@@ -258,9 +229,9 @@ export default function Plans() {
             border: "1px solid rgba(220,53,69,0.25)",
             borderRadius: "var(--radius-md)",
           }}>
-            <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, color: "var(--fg)" }}>Cancel your subscription?</p>
+            <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, color: "var(--fg)" }}>Cancel your plan?</p>
             <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--fg-3)" }}>
-              Your account and data are never deleted.
+              Your account and saved data will stay safe.
             </p>
             <div style={{ display: "flex", gap: 8 }}>
               <button
@@ -273,7 +244,7 @@ export default function Plans() {
                   cursor: cancelling ? "default" : "pointer", fontFamily: "var(--font-body)",
                 }}
               >
-                {cancelling ? "Cancelling…" : "Cancel at period end"}
+                {cancelling ? "Cancelling..." : "Stop after this billing period"}
               </button>
               <button
                 onClick={() => handleCancel(false)}
@@ -285,7 +256,7 @@ export default function Plans() {
                   cursor: cancelling ? "default" : "pointer", fontFamily: "var(--font-body)",
                 }}
               >
-                Cancel immediately
+                Stop now
               </button>
               <button
                 onClick={() => setShowCancelConfirm(false)}
@@ -297,17 +268,37 @@ export default function Plans() {
                   cursor: "pointer", fontFamily: "var(--font-body)",
                 }}
               >
-                Keep plan
+                Keep current plan
               </button>
             </div>
           </div>
         )}
 
         {/* Stats row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 28 }}>
-          {/* Usage */}
+        <div style={{ marginBottom: 28 }}>
           <div style={{ background: "var(--bg-card)", borderRadius: "var(--radius-md)", padding: "20px 22px", border: "1px solid var(--line)" }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--fg-4)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Daily usage</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--fg-4)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Today's usage</div>
+              {canCancel && !showCancelConfirm && (
+                <button
+                  onClick={() => setShowCancelConfirm(true)}
+                  disabled={cancelling}
+                  style={{
+                    padding: "5px 12px", fontSize: 12, fontWeight: 600,
+                    background: "transparent",
+                    color: "var(--fg-3)",
+                    border: "1px solid var(--line)",
+                    borderRadius: "var(--radius-sm)",
+                    cursor: "pointer", fontFamily: "var(--font-body)",
+                    transition: "color 0.15s, border-color 0.15s",
+                  }}
+                  onMouseEnter={e => { (e.target as HTMLButtonElement).style.color = "var(--negative, #e05c5c)"; (e.target as HTMLButtonElement).style.borderColor = "rgba(220,53,69,0.4)"; }}
+                  onMouseLeave={e => { (e.target as HTMLButtonElement).style.color = "var(--fg-3)"; (e.target as HTMLButtonElement).style.borderColor = "var(--line)"; }}
+                >
+                  Cancel subscription
+                </button>
+              )}
+            </div>
             {loading ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <Skeleton w={120} h={36} radius={8} />
@@ -317,10 +308,10 @@ export default function Plans() {
               <>
                 <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 32, color: "var(--fg)", marginBottom: 6, lineHeight: 1 }}>
                   {usage ? `${usage.remaining}` : "0"}
-                  <span style={{ fontSize: 16, fontWeight: 500, color: "var(--fg-3)", marginLeft: 6 }}>remaining</span>
+                  <span style={{ fontSize: 16, fontWeight: 500, color: "var(--fg-3)", marginLeft: 6 }}>left today</span>
                 </div>
                 <div style={{ fontSize: 13, color: "var(--fg-3)" }}>
-                  {usage ? `${usage.used} of ${usage.limit} messages used today` : "No usage data"}
+                  {usage ? `${usage.used} of ${usage.limit} messages used today` : "No usage details yet"}
                 </div>
                 {usage && (
                   <div style={{ marginTop: 12, height: 4, borderRadius: 2, background: "var(--bg-canvas)", overflow: "hidden" }}>
@@ -332,44 +323,11 @@ export default function Plans() {
                     }} />
                   </div>
                 )}
-              </>
-            )}
-          </div>
-
-          {/* Subscription status */}
-          <div style={{ background: "var(--bg-card)", borderRadius: "var(--radius-md)", padding: "20px 22px", border: "1px solid var(--line)" }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--fg-4)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Subscription</div>
-            {loading ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <Skeleton w={100} h={28} radius={8} />
-                <Skeleton w={180} h={14} />
-              </div>
-            ) : subscription ? (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <div style={{
-                    width: 7, height: 7, borderRadius: "50%",
-                    background: statusColor[subscription.status] ?? "var(--fg-4)",
-                    flexShrink: 0,
-                  }} />
-                  <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 20, color: "var(--fg)", textTransform: "capitalize" }}>
-                    {subscription.status}
-                  </span>
-                </div>
-                <div style={{ fontSize: 13, color: "var(--fg-3)" }}>
-                  {PLAN_LIMITS[subscription.plan].label} plan
-                  {subscription.currentEnd ? ` · renews ${new Date(subscription.currentEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}
-                </div>
-                {subscription.cancelAtCycleEnd && (
-                  <div style={{ marginTop: 8, fontSize: 12, color: "var(--warning)", fontWeight: 600 }}>
-                    Cancels at end of billing period
+                {subscription?.cancelAtCycleEnd && (
+                  <div style={{ marginTop: 10, fontSize: 12, color: "var(--warning)", fontWeight: 600 }}>
+                    Subscription will stop at the end of this billing period
                   </div>
                 )}
-              </>
-            ) : (
-              <>
-                <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 20, color: "var(--fg)", marginBottom: 6 }}>Free plan</div>
-                <div style={{ fontSize: 13, color: "var(--fg-3)" }}>Subscribe below to unlock more accounts and messages.</div>
               </>
             )}
           </div>
@@ -480,7 +438,7 @@ export default function Plans() {
                       transition: "opacity 0.15s",
                     }}
                   >
-                    {isCurrent ? "Current plan" : startingPlan === p ? "Opening checkout…" : `Subscribe to ${limits.label}`}
+                    {isCurrent ? "Current plan" : startingPlan === p ? "Opening payment..." : `Choose ${limits.label}`}
                   </button>
                 ) : (
                   <button disabled style={{
@@ -500,7 +458,7 @@ export default function Plans() {
 
         {!loading && !billingReady && (
           <p style={{ marginTop: 20, fontSize: 12, color: "var(--accent)", textAlign: "center" }}>
-            Razorpay is not configured. Add API keys and plan IDs on the server to enable subscriptions.
+            Payments are not set up yet on this app.
           </p>
         )}
       </div>

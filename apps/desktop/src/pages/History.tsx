@@ -61,7 +61,7 @@ export default function History() {
         {/* Sidebar */}
         <div style={{ width: 320, flexShrink: 0, borderRight: "1px solid var(--line)", overflowY: "auto", padding: "24px 16px" }}>
           <h1 style={{ margin: "0 0 18px", fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--fg)", padding: "0 4px" }}>
-            Run History
+            Past Activity
           </h1>
 
           {loading ? (
@@ -82,7 +82,7 @@ export default function History() {
               ))}
             </div>
           ) : jobs.length === 0 ? (
-            <p style={{ color: "var(--fg-4)", fontSize: 13, padding: "0 4px" }}>No runs yet.</p>
+            <p style={{ color: "var(--fg-4)", fontSize: 13, padding: "0 4px" }}>No activity yet.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {jobs.map((job) => (
@@ -156,7 +156,7 @@ export default function History() {
             <JobDetail job={selectedJob} />
           ) : (
             <div style={{ textAlign: "center", paddingTop: 80, color: "var(--fg-4)", fontSize: 13 }}>
-              Select a run to see details
+              Select an activity to see details
             </div>
           )}
         </div>
@@ -170,7 +170,7 @@ function JobDetail({ job }: { job: AutomationJob }) {
   const duration = job.startedAt && job.stoppedAt
     ? fmtDuration(new Date(job.stoppedAt).getTime() - new Date(job.startedAt).getTime())
     : job.startedAt
-      ? "Running..."
+      ? "In progress..."
       : "-";
 
   return (
@@ -187,7 +187,7 @@ function JobDetail({ job }: { job: AutomationJob }) {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
-          <MetricCell label="Targets" value={job.totalTargets} />
+          <MetricCell label="People" value={job.totalTargets} />
           <MetricCell label="Sent" value={job.sent} color="var(--positive)" />
           <MetricCell label="Failed" value={job.failed} color="var(--accent)" />
           <MetricCell label="Duration" value={duration} />
@@ -195,7 +195,7 @@ function JobDetail({ job }: { job: AutomationJob }) {
 
         {job.defaultMessage && (
           <div style={{ background: "var(--bg-input)", borderRadius: "var(--radius-sm)", padding: "9px 12px", fontSize: 12, color: "var(--fg-2)" }}>
-            <span style={{ color: "var(--fg-3)" }}>Default: </span>
+            <span style={{ color: "var(--fg-3)" }}>Saved message: </span>
             {job.defaultMessage}
           </div>
         )}
@@ -203,10 +203,10 @@ function JobDetail({ job }: { job: AutomationJob }) {
 
       <div style={{ ...card, marginTop: 14 }}>
         <h3 style={{ margin: "0 0 14px", fontFamily: "var(--font-display)", fontSize: 14, color: "var(--fg)" }}>
-          Messages ({records.length})
+          Messages sent ({records.length})
         </h3>
         {records.length === 0 ? (
-          <p style={{ color: "var(--fg-4)", fontSize: 13 }}>No records for this run.</p>
+          <p style={{ color: "var(--fg-4)", fontSize: 13 }}>No messages were saved for this activity.</p>
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
