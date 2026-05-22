@@ -119,14 +119,16 @@ instaflow/
 
 ## Dashboard
 
-<img width="1729" height="852" alt="Screenshot 2026-05-22 194241" src="https://github.com/user-attachments/assets/19884305-7bc3-421c-92ad-f088ac142bd2" />
+<img width="1729" height="852" alt="Screenshot 2026-05-22 194241" src="https://github.com/user-attachments/assets/0a18e94c-850e-4996-8ac9-cc07e1d3d1b1" />
+
 
 
 ---
 
 ## Accounts Page
 
-<img width="1402" height="563" alt="Screenshot 2026-05-22 194300" src="https://github.com/user-attachments/assets/fd2470e4-a8c6-44f4-a41b-b56318e3e8d5" />
+<img width="1402" height="563" alt="Screenshot 2026-05-22 194300" src="https://github.com/user-attachments/assets/35e4d217-4a88-4099-988e-b4a2e28a4f32" />
+
 
 
 ---
@@ -140,7 +142,8 @@ instaflow/
 
 ## Activity History
 
-<img width="1448" height="857" alt="Screenshot 2026-05-22 194332" src="https://github.com/user-attachments/assets/95e4cf20-d519-4963-a6e5-776b496c8b71" />
+<img width="1448" height="857" alt="Screenshot 2026-05-22 194332" src="https://github.com/user-attachments/assets/405ca8a3-fcff-41af-b607-37d41c630c4d" />
+
 
 
 ---
