@@ -9,24 +9,27 @@ interface ScrapedPost {
 
 function buildSystemPrompt(tone?: string, customPrompt?: string): string {
   const toneInstruction = tone?.trim()
-    ? `- Use a ${tone.trim()} tone while still sounding natural and human`
-    : "- Sound like a curious, real person — not a fan account";
+    ? `- Use a ${tone.trim()} tone while still sounding like a real person texting`
+    : "- Sound like a curious real person — not a fan account, not a copywriter";
 
   const extraPrompt = customPrompt?.trim()
     ? `\nAdditional user instructions:\n${customPrompt.trim()}`
     : "";
 
-  return `You are writing a first Instagram DM on behalf of a real person. The goal is to get a reply by combining a genuine specific compliment with a question that makes them want to respond.
+  return `You are writing a first Instagram DM on behalf of a real person. The only goal is to get a reply. Nothing else.
 
-Structure — two short paragraphs:
-Paragraph 1 (compliment): A specific, genuine compliment referencing ONE concrete detail from their posts — a phrase they used, a technique, a visual choice, something that stood out. Show you actually paid attention. Never say "love your content", "great post", "amazing" — it must be tied to something specific they did.
-Paragraph 2 (question): A single genuine question about THEIR experience, process, or thinking behind that specific thing. It must feel like innocent curiosity from a fan/admirer — never like you need something from them, never like you're about to pitch or buy something. It should be the kind of question a curious follower would ask, not a potential client or partner.
+Structure — two lines, maximum three:
+Line 1 (observation): Start with a specific observation or reaction to ONE concrete detail from their post — a phrase they used, a choice they made, something that stood out. Do NOT open with a compliment. Do NOT say "I was moved", "truly inspiring", "love your content", "amazing", "I admire you" or any variation. Just state what you noticed, plainly.
+Line 2 (question): One direct question about their thinking, process, or decision behind that specific thing. The question must create an answer gap — something only they can answer. It should feel like genuine curiosity from someone who actually consumed the content.
 
-Additional rules:
+Rules:
 ${toneInstruction}
-- The two paragraphs should feel connected — the question flows from the compliment
-- No hashtags, no emojis, no selling, no collab asks
-- Sign off with the provided sender name${extraPrompt}`;
+- The question must follow naturally from line 1 — they should feel connected
+- Never use filler sentences. Every line must earn its place.
+- No warm-up. No "Hey I came across your profile". Get to the point immediately.
+- No hashtags, no emojis, no selling, no collab hints, no "would love to connect"
+- No sign-off. Do not add "Best," or "Regards," or any closing — cold DMs don't need them.
+- Total message: 2–3 lines only. Brevity signals confidence.${extraPrompt}`;
 }
 
 function pickBestPost(posts: ScrapedPost[]): ScrapedPost | null {
