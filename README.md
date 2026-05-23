@@ -1,151 +1,246 @@
-# InstaFlow — Instagram DM Automation SaaS
+# InstaFlow – Instagram Outreach Automation Platform
 
-Electron desktop app + Node.js API backend for plan-gated, AI-personalized Instagram DM automation.
+<div align="center">
 
----
+### AI-Powered Instagram Outreach & DM Automation Platform
 
-## Architecture
+Built with **Playwright**, **Node.js**, and a **Monorepo Architecture** to automate personalized Instagram outreach at scale.
 
-```
-Electron Desktop App  →  Backend API (Express + Prisma)  →  Neon DB (PostgreSQL)
-         ↓
-  Playwright Worker (child process per IG account, stdin/stdout IPC)
-```
+</div>
 
 ---
 
-## Prerequisites
+## 🚀 Overview
 
-- Node.js 18+
-- A [Neon](https://neon.tech) PostgreSQL database
-- (Optional) Azure OpenAI endpoint for AI-personalized messages
+InstaFlow is a full-stack Instagram outreach automation platform designed for creators, agencies, founders, and coaches who want to automate personalized Instagram DMs while maintaining a human-like workflow.
+
+The platform uses browser automation powered by Playwright to handle Instagram interactions safely and efficiently while supporting multi-account workflows, analytics, campaign history, and AI-assisted personalization.
+
+The platform has already been tested with and provided access to **100+ users**.
 
 ---
 
-## Setup
+## ✨ Features
 
-### 1. Clone & install
+- 🔥 Multi-account Instagram automation
+- 🤖 AI-personalized outreach messages
+- 🧠 Custom messaging tone & prompts
+- 📊 Analytics dashboard
+- 📈 Success tracking & reply metrics
+- 🕒 Randomized delay system
+- 📂 Campaign history tracking
+- ⚡ High-speed Playwright automation
+- 🏗️ Monorepo architecture
+- 🔐 Authentication & user management
+- 💳 Subscription & usage plans
+- 📥 Bulk username targeting
+- ☁️ Scalable backend infrastructure
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+- Next.js
+- React
+- Tailwind CSS
+- TypeScript
+
+### Backend
+- Node.js
+- Express
+- Playwright
+- REST APIs
+
+### Database & Infrastructure
+- PostgreSQL
+- Docker
+- VPS Deployment
+- Monorepo Setup
+
+### Automation
+- Playwright browser automation
+- Human-like randomized delays
+- Session handling
+- Multi-account orchestration
+
+---
+
+## 🏗️ Monorepo Structure
 
 ```bash
-cd insta-saas
+instaflow/
+│
+├── apps/
+│   ├── web/             # Frontend dashboard
+│   ├── server/          # Backend APIs
+│   └── automation/      # Playwright automation engine
+│
+├── packages/
+│   ├── ui/
+│   ├── config/
+│   └── shared/
+│
+└── docker/
+```
+
+---
+
+## ⚙️ Core Functionalities
+
+### 🔹 Account Management
+- Connect multiple Instagram accounts
+- Session persistence
+- Re-login handling
+- Account status monitoring
+
+### 🔹 Outreach Automation
+- Automated DM sending
+- Username-based targeting
+- AI-generated personalized messages
+- Delay randomization to simulate human behavior
+
+### 🔹 Dashboard & Analytics
+- Messages sent
+- Success rate
+- Failed deliveries
+- Seen vs replied tracking
+- Historical campaign logs
+
+### 🔹 Subscription System
+- Free / Pro / Max plans
+- Daily message limits
+- Feature gating
+- Usage monitoring
+
+---
+
+# 📸 Screenshots
+
+## Dashboard
+
+<img width="1729" height="852" alt="Screenshot 2026-05-22 194241" src="https://github.com/user-attachments/assets/133171de-8b3f-4a08-9606-06f05f26a957" />
+
+
+
+
+---
+
+## Accounts Page
+
+<img width="1402" height="563" alt="Screenshot 2026-05-22 194300" src="https://github.com/user-attachments/assets/35e4d217-4a88-4099-988e-b4a2e28a4f32" />
+
+
+
+---
+
+## Automation Panel
+
+<img width="1431" height="799" alt="Screenshot 2026-05-22 194312" src="https://github.com/user-attachments/assets/b3a3a374-cdd1-4d38-a3c1-e68f9836ba17" />
+
+
+---
+
+## Activity History
+
+<img width="1448" height="857" alt="Screenshot 2026-05-22 194332" src="https://github.com/user-attachments/assets/405ca8a3-fcff-41af-b607-37d41c630c4d" />
+
+
+
+---
+
+## Pricing & Plans
+
+<img width="679" height="431" alt="image" src="https://github.com/user-attachments/assets/11201083-a25c-4b24-8610-25f4c9d0e5b2" />
+
+
+---
+
+# 🧠 How It Works
+
+```mermaid
+flowchart TD
+
+A[User Dashboard] --> B[Backend API]
+B --> C[Playwright Automation Engine]
+C --> D[Instagram Browser Session]
+D --> E[Send Personalized DMs]
+E --> F[Track Replies & Analytics]
+F --> G[Dashboard Updates]
+```
+
+---
+
+# 🚀 Installation
+
+## Clone Repository
+
+```bash
+git clone https://github.com/yourusername/instaflow.git
+cd instaflow
+```
+
+---
+
+## Install Dependencies
+
+```bash
 npm install
 ```
 
-### 2. Configure the server
+---
 
-```bash
-cp server/.env.example server/.env
-```
-
-Edit `server/.env`:
+## Setup Environment Variables
 
 ```env
-DATABASE_URL=postgresql://...@ep-xxx.neon.tech/instasaas?sslmode=require
-JWT_SECRET=<generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))">
-ENCRYPTION_KEY=<generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))">
-PORT=3001
-NODE_ENV=development
+DATABASE_URL=
+JWT_SECRET=
+OPENAI_API_KEY=
 ```
 
-### 3. Run database migrations
+---
+
+## Run Development Server
 
 ```bash
-npm run db:migrate
-```
-
-This creates all tables (`users`, `ig_accounts`, `automation_jobs`, `job_logs`).
-
-### 4. Start development
-
-In three separate terminals:
-
-```bash
-# Terminal 1 — API server
-npm run dev:server
-
-# Terminal 2 — Electron desktop app (starts Vite + Electron)
-npm run dev:desktop
-```
-
-The worker starts automatically when an automation job is triggered from the UI.
-
----
-
-## Subscription Plans
-
-| Plan     | IG Accounts | Price   |
-|----------|-------------|---------|
-| Free     | 1           | $0/mo   |
-| Pro      | 2           | $29/mo  |
-| Business | 5           | $79/mo  |
-
-Plan limits are enforced server-side only. The `POST /accounts/connect` route uses `enforcePlanLimit` middleware.
-
----
-
-## API Routes
-
-| Method | Route                     | Auth | Plan Guard |
-|--------|---------------------------|------|------------|
-| POST   | /auth/signup              | No   | No         |
-| POST   | /auth/login               | No   | No         |
-| GET    | /auth/me                  | Yes  | No         |
-| GET    | /accounts                 | Yes  | No         |
-| POST   | /accounts/connect         | Yes  | Yes        |
-| DELETE | /accounts/:id             | Yes  | No         |
-| GET    | /accounts/:id/session     | Yes  | No         |
-| GET    | /plans                    | Yes  | No         |
-| POST   | /plans/upgrade            | Yes  | No         |
-| POST   | /automation/start         | Yes  | No         |
-| POST   | /automation/stop/:jobId   | Yes  | No         |
-| GET    | /automation/status/:jobId | Yes  | No         |
-
----
-
-## Worker IPC Protocol
-
-The Electron main process spawns one worker child process per IG account.
-
-**Commands (main → worker, via stdin, newline-delimited JSON):**
-
-```json
-{ "cmd": "start", "accountId": "...", "jobId": "...", "username": "...", "password": "...", "sessionDir": "./sessions/...", "targets": [...], "defaultMessage": "...", "minDelayMs": 20000, "maxDelayMs": 60000, "azureOpenAiEndpoint": "...", "azureOpenAiKey": "...", "azureOpenAiDeployment": "gpt-4o-mini" }
-{ "cmd": "stop" }
-```
-
-**Messages (worker → main, via stdout, newline-delimited JSON):**
-
-```json
-{ "type": "log",      "accountId": "...", "jobId": "...", "level": "info|warn|error", "message": "..." }
-{ "type": "progress", "accountId": "...", "jobId": "...", "sent": 3, "failed": 1 }
-{ "type": "status",   "accountId": "...", "jobId": "...", "status": "running|done|stopped|error", "sent": 3, "failed": 1 }
+npm run dev
 ```
 
 ---
 
-## Environment Variables
+# 📊 Current Scale
 
-### `server/.env`
-
-| Variable         | Description                                   |
-|------------------|-----------------------------------------------|
-| `DATABASE_URL`   | Neon PostgreSQL connection string             |
-| `JWT_SECRET`     | 64-char hex string for JWT signing            |
-| `ENCRYPTION_KEY` | 64-char hex string for AES-256-GCM sessions   |
-| `PORT`           | API port (default: 3001)                      |
-| `NODE_ENV`       | `development` or `production`                 |
-
-### Azure OpenAI (in-app via UI)
-
-Configured per-session in the Automation page. Stored in `localStorage` for convenience.
+- ✅ 100+ users given platform access
+- ✅ Multi-account automation tested
+- ✅ AI-personalized outreach working
+- ✅ Stable Playwright automation flows
 
 ---
 
-## Security
+# 🔐 Important Note
 
-- Passwords hashed with bcrypt (cost 12)
-- JWT tokens expire after 7 days
-- Instagram passwords stored AES-256-GCM encrypted in DB
-- Plan limits enforced server-side only
-- Electron uses `contextIsolation: true`, `nodeIntegration: false`
-- Workers receive credentials via IPC only — no direct DB access
+This project is intended for educational and automation workflow purposes. Users should comply with Instagram's terms of service while using automation tools.
+
+---
+
+# 👨‍💻 Author
+
+### Suryansh Singh
+
+- Full Stack Developer
+- Automation Engineer
+- Founder of TheNerdishMic
+
+---
+
+# ⭐ Future Improvements
+
+- Proxy rotation support
+- AI lead scoring
+- CRM integration
+- Campaign templates
+- Smart reply automation
+- Team collaboration support
+- Inbox management system
+
+---
