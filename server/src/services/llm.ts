@@ -5,7 +5,7 @@ interface ScrapedPost {
   caption: string;
   likes: number | null;
   comments: number | null;
-  postedAt: Date;
+  postedAt?: Date;
   postId?: string;
 }
 
@@ -53,8 +53,12 @@ function pickBestPost(posts: ScrapedPost[]): ScrapedPost | null {
   if (posts.length === 0) return null;
 
   return posts.reduce((best, p) => {
+    // Use post date or default to now
+    const postDate = p.postedAt ?? new Date();
+    const bestDate = best.postedAt ?? new Date();
+
     // Calculate recency score (higher for recent posts)
-    const daysSincePost = (Date.now() - p.postedAt.getTime()) / (1000 * 60 * 60 * 24);
+    const daysSincePost = (Date.now() - postDate.getTime()) / (1000 * 60 * 60 * 24);
     const recencyScore = Math.max(0, 30 - daysSincePost); // Last 30 days get points
 
     // Calculate engagement score
@@ -64,7 +68,7 @@ function pickBestPost(posts: ScrapedPost[]): ScrapedPost | null {
     const totalScore = engagementScore + recencyScore * 5;
 
     // Calculate best post score
-    const bestDaysSincePost = (Date.now() - best.postedAt.getTime()) / (1000 * 60 * 60 * 24);
+    const bestDaysSincePost = (Date.now() - bestDate.getTime()) / (1000 * 60 * 60 * 24);
     const bestRecencyScore = Math.max(0, 30 - bestDaysSincePost);
     const bestEngagementScore = (best.likes ?? 0) + (best.comments ?? 0) * 3;
     const bestTotalScore = bestEngagementScore + bestRecencyScore * 5;
@@ -103,19 +107,19 @@ export async function generatePersonalizedMessage(
         .join(", ") || "engagement hidden"
     : "";
 
-  // Build focus block with timestamp
+  // Build focus block with timestamp (if available)
   const focusBlock = bestPost
-    ? `FOCUS POST (${engagementLabel}, posted ${formatTimeAgo(bestPost.postedAt)} - base the message primarily on this one):\n${bestPost.caption || "(caption empty)"}`
+    ? `FOCUS POST (${engagementLabel}${bestPost.postedAt ? `, posted ${formatTimeAgo(bestPost.postedAt)}` : ""} - base the message primarily on this one):\n${bestPost.caption || "(caption empty)"}`
     : "";
 
   // Build context block with chronological ordering
   const contextBlock =
     otherPosts.length > 0
       ? `\nOther recent posts for additional context:\n${otherPosts
-          .sort((a, b) => b.postedAt.getTime() - a.postedAt.getTime())
+          .sort((a, b) => (b.postedAt?.getTime() ?? 0) - (a.postedAt?.getTime() ?? 0))
           .map(
             (p, i) =>
-              `Post ${i + 2} (posted ${formatTimeAgo(p.postedAt)}):\n${p.caption || "(caption empty)"}`,
+              `Post ${i + 2}${p.postedAt ? ` (posted ${formatTimeAgo(p.postedAt)})` : ""}:\n${p.caption || "(caption empty)"}`,
           )
           .join("\n\n---\n\n")}`
       : "";
